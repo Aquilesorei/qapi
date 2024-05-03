@@ -13,7 +13,10 @@ import kotlin.reflect.full.findAnnotation
 import org.aquiles.EndPoint
 import org.http4k.core.Request
 import org.http4k.core.Response
+import org.http4k.routing.path
+import kotlin.reflect.KParameter
 import kotlin.reflect.full.findAnnotations
+import kotlin.reflect.full.instanceParameter
 
 class Router( vararg list: Route) {
 
@@ -33,11 +36,39 @@ class Router( vararg list: Route) {
       app = routes(app, path bind method to handler)
   }
 
+    //todo use functions.callBy to pass a map of parameter value
 
 
+    private fun processParams(parameters: List<KParameter>, req : Request): MutableMap<KParameter, Any> {
+        val map = mutableMapOf<KParameter,Any>()
+        parameters.forEach { param ->
+
+           param.name?.let {name ->
+               println(param.name)
+            var res = req.query(name);
+             if(res == null) {
+                 res = req.path(name)
+                 if(res == null){
+                     // not found
+                 }else{
+                     map[param] = res
+                 }
+             }else{
+                 map[param] = res
+
+             }
+           }
+
+        }
+
+
+       return map
+
+    }
     fun addAnnotatedHandler(handler: RoutingScope) {
         val kClass = handler::class
         for (function in kClass.members) {
+
             val endpointAnnotation = function.findAnnotation<EndPoint>()
             if (endpointAnnotation != null) {
                 println("Found endpoint: ${endpointAnnotation.method} ${endpointAnnotation.path} on ${function.name}")
@@ -49,10 +80,17 @@ class Router( vararg list: Route) {
             } else {
                 when {
                     function.findAnnotation<Get>() != null -> {
+
+
+                        function.parameters.forEach { param ->
+                            println("Found GET endpoint: ${function.name} with parameter ${param.name} with type ${param.type}")
+                        }
                         val path = function.findAnnotation<Get>()!!.path
                         println("Found GET endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                           val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.GET, path)
@@ -134,7 +172,6 @@ class Router( vararg list: Route) {
             }
         }
     }
-
 
 
 
