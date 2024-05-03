@@ -16,6 +16,7 @@ import org.http4k.core.Response
 
 class Router( vararg list: Route) {
 
+    private lateinit var server : Http4kServer;
 
 
     constructor(list: List<Route>) : this(*list.toTypedArray())
@@ -48,7 +49,7 @@ class Router( vararg list: Route) {
     }
 
 
-    private lateinit var server : Http4kServer;
+
 
 
     fun start(port: Int ) {

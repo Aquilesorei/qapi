@@ -6,35 +6,33 @@ import org.http4k.core.Status.Companion.OK
 
 import org.http4k.core.*
 import org.http4k.routing.path
-class RoutingScope {
+class MyScope : RoutingScope() {
     @EndPoint(Method.GET, "/add")
     fun add(request: Request): Response {
        return Response(OK).body("addddddingkkgk")
     }
 
+   @EndPoint(Method.GET, "/hello/{name}")
+   fun hello(request: Request): Response {
+       return Response(OK).body("Hello, ${request.path("name")}")
+   }
 
+  @EndPoint(Method.POST, "/echo")
+  fun echo(request: Request): Response {
+    return Response(OK).body(request.bodyString())
+  }
 
 
 }
 fun main() {
     // Define some routes
 
-    val routes = arrayOf(
-        Route.get("/hello/{name}") { req ->
-            val name = req.path("name") ?: "World"
-            Response(OK).body("Hello, $name!")
-        },
-        Route.post( "/echo") { req ->
-            Response(OK).body(req.bodyString())
-        }
-    )
-
     // Create a router with the defined routes
-    val router = Router(*routes)
+   // val router = Router()
 
-    router.addAnnotatedHandler(RoutingScope())
+   // router.addAnnotatedHandler(MyScope())
 
     // Start the server
-  router.start(9000)
+   MyScope().toRouter().start(9000)
 
 }
