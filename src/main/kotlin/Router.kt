@@ -13,6 +13,7 @@ import kotlin.reflect.full.findAnnotation
 import org.aquiles.EndPoint
 import org.http4k.core.Request
 import org.http4k.core.Response
+import kotlin.reflect.full.findAnnotations
 
 class Router( vararg list: Route) {
 
@@ -32,21 +33,108 @@ class Router( vararg list: Route) {
       app = routes(app, path bind method to handler)
   }
 
-    fun addAnnotatedHandler(handler: Any) {
 
+
+    fun addAnnotatedHandler(handler: RoutingScope) {
         val kClass = handler::class
         for (function in kClass.members) {
-            function.findAnnotation<EndPoint>()?.let { endpoint ->
-                println("Found endpoint: ${endpoint.method} ${endpoint.path} on ${function.name}")
+            val endpointAnnotation = function.findAnnotation<EndPoint>()
+            if (endpointAnnotation != null) {
+                println("Found endpoint: ${endpointAnnotation.method} ${endpointAnnotation.path} on ${function.name}")
                 val functionHandler = { req: Request ->
-                    val res = function.call(handler,req)
-                   res   as Response
+                    val res = function.call(handler, req)
+                    res as Response
                 }
-                addHandler(functionHandler,endpoint.method, endpoint.path)
+                addHandler(functionHandler, endpointAnnotation.method, endpointAnnotation.path)
+            } else {
+                when {
+                    function.findAnnotation<Get>() != null -> {
+                        val path = function.findAnnotation<Get>()!!.path
+                        println("Found GET endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.GET, path)
+                    }
+                    function.findAnnotation<Post>() != null -> {
+                        val path = function.findAnnotation<Post>()!!.path
+                        println("Found POST endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.POST, path)
+                    }
+                    // Add support for other HTTP methods
+                    function.findAnnotation<Put>() != null -> {
+                        val path = function.findAnnotation<Put>()!!.path
+                        println("Found PUT endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.PUT, path)
+                    }
+                    function.findAnnotation<Delete>() != null -> {
+                        val path = function.findAnnotation<Delete>()!!.path
+                        println("Found DELETE endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.DELETE, path)
+                    }
+                    function.findAnnotation<Patch>() != null -> {
+                        val path = function.findAnnotation<Patch>()!!.path
+                        println("Found PATCH endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.PATCH, path)
+                    }
+                    function.findAnnotation<Head>() != null -> {
+                        val path = function.findAnnotation<Head>()!!.path
+                        println("Found HEAD endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.HEAD, path)
+                    }
+                    function.findAnnotation<Options>() != null -> {
+                        val path = function.findAnnotation<Options>()!!.path
+                        println("Found OPTIONS endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.OPTIONS, path)
+                    }
+                    function.findAnnotation<Trace>() != null -> {
+                        val path = function.findAnnotation<Trace>()!!.path
+                        println("Found TRACE endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.TRACE, path)
+                    }
+                    function.findAnnotation<Purge>() != null -> {
+                        val path = function.findAnnotation<Purge>()!!.path
+                        println("Found Purge endpoint: $path on ${function.name}")
+                        val functionHandler = { req: Request ->
+                            val res = function.call(handler, req)
+                            res as Response
+                        }
+                        addHandler(functionHandler, Method.PURGE, path)
+                    }
+                }
             }
         }
-
     }
+
 
 
 

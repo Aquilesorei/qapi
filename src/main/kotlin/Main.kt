@@ -7,17 +7,17 @@ import org.http4k.core.Status.Companion.OK
 import org.http4k.core.*
 import org.http4k.routing.path
 class MyScope : RoutingScope() {
-    @EndPoint(Method.GET, "/add")
+    @Get( "/add")
     fun add(request: Request): Response {
        return Response(OK).body("addddddingkkgk")
     }
 
-   @EndPoint(Method.GET, "/hello/{name}")
+   @Get( "/hello/{name}")
    fun hello(request: Request): Response {
        return Response(OK).body("Hello, ${request.path("name")}")
    }
 
-  @EndPoint(Method.POST, "/echo")
+  @Post("/echo")
   fun echo(request: Request): Response {
     return Response(OK).body(request.bodyString())
   }
