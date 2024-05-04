@@ -49,12 +49,18 @@ class Router( vararg list: Route) {
              if(res == null) {
                  res = req.path(name)
                  if(res == null){
-                     // not found
+                     //  not found
                  }else{
-                     map[param] = res
+
+                     castBasedOnType(res,param.type)?.let {
+                         map[param] = it
+                     }
+
                  }
              }else{
-                 map[param] = res
+                 castBasedOnType(res,param.type)?.let {
+                     map[param] = it
+                 }
 
              }
            }
@@ -73,7 +79,9 @@ class Router( vararg list: Route) {
             if (endpointAnnotation != null) {
                 println("Found endpoint: ${endpointAnnotation.method} ${endpointAnnotation.path} on ${function.name}")
                 val functionHandler = { req: Request ->
-                    val res = function.call(handler, req)
+                     val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                     res as Response
                 }
                 addHandler(functionHandler, endpointAnnotation.method, endpointAnnotation.path)
@@ -99,7 +107,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Post>()!!.path
                         println("Found POST endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.POST, path)
@@ -109,7 +119,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Put>()!!.path
                         println("Found PUT endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.PUT, path)
@@ -118,7 +130,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Delete>()!!.path
                         println("Found DELETE endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.DELETE, path)
@@ -127,7 +141,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Patch>()!!.path
                         println("Found PATCH endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.PATCH, path)
@@ -136,7 +152,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Head>()!!.path
                         println("Found HEAD endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.HEAD, path)
@@ -145,7 +163,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Options>()!!.path
                         println("Found OPTIONS endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.OPTIONS, path)
@@ -154,7 +174,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Trace>()!!.path
                         println("Found TRACE endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.TRACE, path)
@@ -163,7 +185,9 @@ class Router( vararg list: Route) {
                         val path = function.findAnnotation<Purge>()!!.path
                         println("Found Purge endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-                            val res = function.call(handler, req)
+                             val  params = processParams(function.parameters,req)
+                            params[function.instanceParameter!!] = handler;
+                            val res = function.callBy(params)
                             res as Response
                         }
                         addHandler(functionHandler, Method.PURGE, path)
