@@ -36,41 +36,29 @@ class Router( vararg list: Route) {
       app = routes(app, path bind method to handler)
   }
 
-    //todo use functions.callBy to pass a map of parameter value
 
+    private fun processParams(parameters: List<KParameter>, req: Request): MutableMap<KParameter, Any> {
+        val map = mutableMapOf<KParameter, Any>()
 
-    private fun processParams(parameters: List<KParameter>, req : Request): MutableMap<KParameter, Any> {
-        val map = mutableMapOf<KParameter,Any>()
         parameters.forEach { param ->
+            param.name?.let { name ->
+                println(param.name)
 
-           param.name?.let {name ->
-               println(param.name)
-            var res = req.query(name);
-             if(res == null) {
-                 res = req.path(name)
-                 if(res == null){
-                     //  not found
-                 }else{
+                val res = req.query(name) ?: req.path(name)
 
-                     castBasedOnType(res,param.type)?.let {
-                         map[param] = it
-                     }
-
-                 }
-             }else{
-                 castBasedOnType(res,param.type)?.let {
-                     map[param] = it
-                 }
-
-             }
-           }
-
+                if (res != null) {
+                    castBasedOnType(res, param.type)?.let {
+                        map[param] = it
+                    }
+                } else {
+                    // Handle case where parameter is not found in query or path
+                }
+            }
         }
 
-
-       return map
-
+        return map
     }
+
     fun addAnnotatedHandler(handler: RoutingScope) {
         val kClass = handler::class
         for (function in kClass.members) {
