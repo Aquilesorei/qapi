@@ -12,7 +12,7 @@ annotation class Get(val path: String)
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class Post(val path: String)
+annotation class Post(val path: String,val multipartFields: Array<String> = [],val multipartFiles: Array<String> = ["file"])
 
 
 @Target(AnnotationTarget.FUNCTION)

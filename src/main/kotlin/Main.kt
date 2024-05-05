@@ -5,8 +5,9 @@ package org.aquiles
 import org.http4k.core.Status.Companion.OK
 
 import org.http4k.core.*
+import org.http4k.routing.RoutingHttpHandler
 import org.http4k.routing.path
-class MyScope : RoutingScope() {
+class MyScope(prefix : String? = null) : RoutingScope(prefix) {
 
     @Get( "/add/{a}/{b}")
     fun add(a : Int, b : Int): Response {
@@ -18,26 +19,27 @@ class MyScope : RoutingScope() {
        return Response(OK).body("Hello, $name you are $lastname")
    }
 
-/*  @Post("/echo")
-  fun echo(request: Request): Response {
-    return Response(OK).body(request.bodyString())
-  }
-    */
+   @Post("/upload", multipartFiles = ["file","file1"])
+   fun upload(files: List<UploadFile>): Response {
 
 
 
+      val builder =  StringBuilder();
+       for (f in files) {
+           builder.append(f.fileName).append(" ")
+           f.write("./upload/")
+       }
 
+       return Response(OK).body("received ${builder.toString()}")
+   }
 
 }
+
+
 fun main() {
-    // Define some routes
+    val router = Router()
 
-    // Create a router with the defined routes
-   // val router = Router()
+    router.addAnnotatedHandler(MyScope(prefix = "/api"))
 
-   // router.addAnnotatedHandler(MyScope())
-
-    // Start the server
-   MyScope().toRouter().start(9000)
-
+    router.start(9000)
 }
