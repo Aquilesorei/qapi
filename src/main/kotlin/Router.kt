@@ -6,28 +6,21 @@ import org.http4k.routing.routes
 import org.http4k.server.Http4kServer
 import org.http4k.server.Undertow
 import org.http4k.server.asServer
-import kotlin.reflect.KFunction
 import kotlin.reflect.full.findAnnotation
-import org.aquiles.EndPoint
 import org.http4k.core.*
 import org.http4k.routing.path
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.KType
-import kotlin.reflect.full.findAnnotations
 import kotlin.reflect.full.instanceParameter
 
-class Router( vararg list: Route) {
+class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()) {
 
     private lateinit var server : Http4kServer;
     private var  app :  RoutingHttpHandler;
 
 
-
     constructor(list: List<Route>) : this(*list.toTypedArray())
-
-
-
 
 
     init{
@@ -41,19 +34,45 @@ class Router( vararg list: Route) {
         return app
     }
 
-  private fun addHandler(handler: (Request) -> Response, method: Method, path: String, prefix :String? = null) {
-      fun formatRoutePrefix(prefix: String?): String {
-          return prefix?.let {
-              if (it.isEmpty()) {
-                  "" // Handle empty prefix case explicitly
-              } else {
-                  if (it.startsWith("/")) it else "/$it"
-              }
-          } ?: "" // Return empty string for null prefix
-      }
 
 
-      app = routes(app, "${formatRoutePrefix(prefix)}$path" bind method to handler)
+
+
+    private fun applyMiddleware(handler: HttpHandler, endpoint: String,middlewareMap : Map<String ,Array<HttpMiddleware>>): HttpHandler {
+        return middlewareMap[endpoint]?.fold(handler) { h, middleware ->
+            middleware.then(h)
+        } ?: handler
+    }
+
+    private  fun applyScopeMiddleware(list : Array<HttpMiddleware>,handler: HttpHandler): HttpHandler {
+
+        if(list.isEmpty()) return  handler
+
+
+       return list.fold(handler) { h, middleware ->
+            middleware.then(h)
+        }
+    }
+
+
+    private  fun applyGlobalMiddleware(handler: HttpHandler): HttpHandler {
+        if(globalMiddleware.isEmpty()) return  handler
+
+
+        return globalMiddleware.fold(handler) { h, middleware ->
+            middleware.then(handler)
+        }
+    }
+
+
+  private fun addHandler(handler: (Request) -> Response, method: Method, path: String, scope: RoutingScope) {
+
+
+      val prefixedPath =  "${formatRoutePrefix(scope.prefix)}$path";
+      var h = applyScopeMiddleware(scope.scopeMiddleware(),handler)
+       h = applyMiddleware(h, prefixedPath,scope.middleware())
+      h = applyGlobalMiddleware(h)
+      app = routes(app,prefixedPath bind method to h)
   }
 
     private fun isListUploadFile(type: KType): Boolean {
@@ -124,42 +143,45 @@ class Router( vararg list: Route) {
         return map
     }
 
-    fun addAnnotatedHandler(handler: RoutingScope) {
+    fun addScope(scope: RoutingScope,globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()) {
 
+        this.globalMiddleware.addAll(globalMiddleware)
 
-
-        val kClass = handler::class
+        val kClass = scope::class
         for (function in kClass.members) {
 
             val endpointAnnotation = function.findAnnotation<EndPoint>()
             if (endpointAnnotation != null) {
-                println("Found endpoint: ${endpointAnnotation.method} ${endpointAnnotation.path} on ${function.name}")
                 val functionHandler = { req: Request ->
                      val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                     res as Response
                 }
 
-                addHandler(functionHandler, Method.POST, endpointAnnotation.path,handler.prefix)
+
+
+
+                addHandler(functionHandler, Method.POST, endpointAnnotation.path,scope=scope)
 
             } else {
                 when {
                     function.findAnnotation<Get>() != null -> {
 
-
-                        function.parameters.forEach { param ->
-                            println("Found GET endpoint: ${function.name} with parameter ${param.name} with type ${param.type}")
-                        }
-                        val path = function.findAnnotation<Get>()!!.path
+                        val anon = function.findAnnotation<Get>()!!;
+                        val path = anon.path
                         println("Found GET endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                            val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.GET, path,handler.prefix)
+
+
+
+
+                        addHandler(functionHandler, Method.GET, anon.path,scope=scope)
                     }
                     function.findAnnotation<Post>() != null -> {
                         val anon = function.findAnnotation<Post>()!!;
@@ -168,14 +190,12 @@ class Router( vararg list: Route) {
                         val mutipartFields = anon.multipartFields;
                         println("Found POST endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
-
-
                              val  params = processParams(function.parameters,req, multipartFields = mutipartFields, multipartFiles = mutipartFiles)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.POST, path,handler.prefix)
+                        addHandler(functionHandler, Method.POST, path,scope=scope)
                     }
                     // Add support for other HTTP methods
                     function.findAnnotation<Put>() != null -> {
@@ -183,77 +203,77 @@ class Router( vararg list: Route) {
                         println("Found PUT endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.PUT, path,handler.prefix)
+                        addHandler(functionHandler, Method.PUT, path,scope=scope)
                     }
                     function.findAnnotation<Delete>() != null -> {
                         val path = function.findAnnotation<Delete>()!!.path
                         println("Found DELETE endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.DELETE, path,handler.prefix)
+                        addHandler(functionHandler, Method.DELETE, path,scope=scope)
                     }
                     function.findAnnotation<Patch>() != null -> {
                         val path = function.findAnnotation<Patch>()!!.path
                         println("Found PATCH endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.PATCH, path,handler.prefix)
+                        addHandler(functionHandler, Method.PATCH, path,scope=scope)
                     }
                     function.findAnnotation<Head>() != null -> {
                         val path = function.findAnnotation<Head>()!!.path
                         println("Found HEAD endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.HEAD, path,handler.prefix)
+                        addHandler(functionHandler, Method.HEAD, path,scope=scope)
                     }
                     function.findAnnotation<Options>() != null -> {
                         val path = function.findAnnotation<Options>()!!.path
                         println("Found OPTIONS endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.OPTIONS, path,handler.prefix)
+                        addHandler(functionHandler, Method.OPTIONS, path,scope=scope)
                     }
                     function.findAnnotation<Trace>() != null -> {
                         val path = function.findAnnotation<Trace>()!!.path
                         println("Found TRACE endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.TRACE, path,handler.prefix)
+                        addHandler(functionHandler, Method.TRACE, path,scope=scope)
                     }
                     function.findAnnotation<Purge>() != null -> {
                         val path = function.findAnnotation<Purge>()!!.path
                         println("Found Purge endpoint: $path on ${function.name}")
                         val functionHandler = { req: Request ->
                              val  params = processParams(function.parameters,req)
-                            params[function.instanceParameter!!] = handler;
+                            params[function.instanceParameter!!] = scope;
                             val res = function.callBy(params)
                             res as Response
                         }
-                        addHandler(functionHandler, Method.PURGE, path,handler.prefix)
+                        addHandler(functionHandler, Method.PURGE, path,scope=scope)
                     }
                 }
             }

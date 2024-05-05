@@ -46,3 +46,12 @@ fun castBasedOnType(value: Any, kType: KType): Any? {
         }
     }
 }
+fun formatRoutePrefix(prefix: String?): String {
+    return prefix?.let {
+        if (it.isEmpty()) {
+            "" // Handle empty prefix case explicitly
+        } else {
+            if (it.startsWith("/")) it else "/$it"
+        }
+    } ?: "" // Return empty string for null prefix
+}
