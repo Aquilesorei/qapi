@@ -7,6 +7,7 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
@@ -18,6 +19,8 @@ dependencies {
     implementation("org.http4k:http4k-multipart")
     implementation("com.google.code.gson:gson:2.8.9")
     implementation(kotlin("reflect"))
+    implementation("org.jboss.xnio:xnio-nio:3.8.16.Final")
+    implementation ("com.andreapivetta.kolor:kolor:1.0.0")
 }
 
 tasks.test {

@@ -1,6 +1,9 @@
 package org.aquiles
 
+import com.andreapivetta.kolor.*
 import com.google.gson.Gson
+import org.http4k.core.Request
+import org.http4k.core.Response
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.javaType
@@ -54,4 +57,23 @@ fun formatRoutePrefix(prefix: String?): String {
             if (it.startsWith("/")) it else "/$it"
         }
     } ?: "" // Return empty string for null prefix
+}
+
+
+
+
+
+
+fun logRequest(request: Request, response : Response) {
+
+    print("INFO:  ".green())
+    print(request.uri.userInfo)
+    print(" \"${request.method.name} ${request.uri.path} ${request.version}\" ")
+    if(response.status.code >=400){
+        println("${response.status.code} ${response.status.description}".red())
+    }else{
+        println("${response.status.code} ${response.status.description}".green())
+    }
+
+
 }
