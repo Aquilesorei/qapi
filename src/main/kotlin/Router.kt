@@ -8,6 +8,7 @@ import kotlin.reflect.full.findAnnotation
 import org.http4k.core.*
 import org.http4k.routing.*
 import java.nio.file.Paths
+import kotlin.reflect.KCallable
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.KType
@@ -151,12 +152,8 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
         for (function in kClass.members) {
             val endpointAnnotation = function.findAnnotation<EndPoint>()
             if (endpointAnnotation != null) {
-                val functionHandler  : HttpHandler = { req: Request ->
-                    val params = processParams(function.parameters, req)
-                    params[function.instanceParameter!!] = scope
-                    val res = function.callBy(params)
-                    res as Response
-                }
+
+                val functionHandler = createFunctionHandler(scope,function)
                 addHandler(functionHandler, Method.POST, endpointAnnotation.path, scope = scope)
             } else {
                 when {
@@ -164,19 +161,7 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
                         val anon = function.findAnnotation<Get>()!!
                         val path = anon.path
                         //println("Found GET endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                             try {
-                              val res = function.callBy(params)
-                              res as Response
-                            }catch (e : Exception){
-
-                                println("fucking sh*t")
-                                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error ${e.message}")
-                            }
-
-                        }
+                        val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.GET, anon.path, scope = scope)
                     }
                     function.findAnnotation<Post>() != null -> {
@@ -188,86 +173,57 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
                         val functionHandler = { req: Request ->
                             val params = processParams(function.parameters, req, multipartFields = multipartFields, multipartFiles = multipartFiles)
                             params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
+                            try {
+                                val res = function.callBy(params)
+                                res as Response
+                            }catch (e : Exception){
+
+                                e.printStackTrace()
+                                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
+                            }
                         }
                         addHandler(functionHandler, Method.POST, path, scope = scope)
                     }
                     function.findAnnotation<Put>() != null -> {
                         val path = function.findAnnotation<Put>()!!.path
                        // println("Found PUT endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler = createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.PUT, path, scope = scope)
                     }
                     function.findAnnotation<Delete>() != null -> {
                         val path = function.findAnnotation<Delete>()!!.path
                        // println("Found DELETE endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.DELETE, path, scope = scope)
                     }
                     function.findAnnotation<Patch>() != null -> {
                         val path = function.findAnnotation<Patch>()!!.path
                         //println("Found PATCH endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler = createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.PATCH, path, scope = scope)
                     }
                     function.findAnnotation<Head>() != null -> {
                         val path = function.findAnnotation<Head>()!!.path
                         //println("Found HEAD endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.HEAD, path, scope = scope)
                     }
                     function.findAnnotation<Options>() != null -> {
                         val path = function.findAnnotation<Options>()!!.path
                         //println("Found OPTIONS endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.OPTIONS, path, scope = scope)
                     }
                     function.findAnnotation<Trace>() != null -> {
                         val path = function.findAnnotation<Trace>()!!.path
                         //println("Found TRACE endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.TRACE, path, scope = scope)
                     }
                     function.findAnnotation<Purge>() != null -> {
                         val path = function.findAnnotation<Purge>()!!.path
                        // println("Found PURGE endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req)
-                            params[function.instanceParameter!!] = scope
-                            val res = function.callBy(params)
-                            res as Response
-                        }
+                        val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.PURGE, path, scope = scope)
                     }
                 }
@@ -276,6 +232,20 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
     }
 
 
+
+    private fun createFunctionHandler(scope: RoutingScope, function: KCallable<*>): HttpHandler {
+        return { req: Request ->
+            try {
+                val params = processParams(function.parameters, req)
+                params[function.instanceParameter!!] = scope
+                val res = function.callBy(params)
+                res as Response
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
+            }
+        }
+    }
     fun staticFiles(path  : String,directory : String){
         val staticFileHandler = static(
             resourceLoader = ResourceLoader.Directory(directory), // Assuming "static" folder in project root
@@ -308,7 +278,6 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
     fun start(port: Int) {
         server = app.asServer(Undertow(port))
         server.start()
-        // Enable Jansi for ANSI escape codes (colors)
         println("Server started on port http://localhost:$port/")
         println("Press Enter to stop the server.")
         readlnOrNull()

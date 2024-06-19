@@ -30,7 +30,7 @@ class MyScope(prefix: String? = null) : RoutingScope(prefix) {
     @Get("/add/{a}/{b}")
     fun add(a: Int, b: Int): Response {
         if(a == 5) {
-            throw BadRequestException("Bad Request")
+            throw Exception("they not like us")
         }
         return Response(OK).body("$a + $b = ${a + b}")
     }
