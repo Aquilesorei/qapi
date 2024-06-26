@@ -1,10 +1,7 @@
 package org.aquiles
 
-import org.http4k.core.HttpHandler
-import org.http4k.core.Method
+import org.http4k.core.*
 import org.http4k.core.Method.*
-import org.http4k.core.Request
-import org.http4k.core.Response
 import org.http4k.core.Status.Companion.OK
 import org.http4k.routing.RoutingHttpHandler
 import org.http4k.routing.bind
@@ -18,21 +15,16 @@ class Route(
     private val  middlewares : List<HttpMiddleware> = emptyList(),
     private  val childRoutes : List<Route> = emptyList()
 ){
+    fun toHandler(): RoutingHttpHandler {
+        val finalHandler = "/" bind method to handler
+        val handlers = listOf(finalHandler) + childRoutes.map { it.toHandler() }
 
-   fun toHandler(): RoutingHttpHandler {
-
-
-
-       val newList =  emptyList<RoutingHttpHandler>().toMutableList();
-       val finalHandler =   "/" bind method to handler
-       newList.add(finalHandler)
-       newList.addAll(childRoutes.map { it.toHandler() })
-
-        return path bind routes(newList)
-
-
+       return middlewares.fold(path bind routes(handlers)) { h, middleware ->
+            middleware.then(h)
+        }
 
     }
+
 
 
 

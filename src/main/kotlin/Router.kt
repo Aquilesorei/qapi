@@ -13,17 +13,16 @@ import org.http4k.routing.*
 import kotlin.reflect.*
 import kotlin.reflect.full.instanceParameter
 
-class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()) {
+class Router() {
 
     private lateinit var server : Http4kServer
     private var app: RoutingHttpHandler
+    private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
 
 
-
-    constructor(list: List<Route>) : this(*list.toTypedArray())
 
     init {
-        app = routes(list.asList().map {
+        app = routes(emptyList<Route>().map {
             it.toHandler()
         }.toList())
 
@@ -68,16 +67,15 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
         }
     }
 
-    /**
-     * Applies global middleware to a handler
-     */
-/*    private fun applyGlobalMiddleware(handler: HttpHandler): HttpHandler {
-        if (globalMiddleware.isEmpty()) return handler
 
-        return globalMiddleware.fold(handler) { h, middleware ->
-            middleware.then(handler)
-        }
-    }*/
+    /**
+     *
+     * adds a global middleware
+     */
+     fun global(middleware  : HttpMiddleware): Router {
+         globalMiddleware.add(middleware);
+        return this
+     }
 
     /**
      * Adds a handler for a given method, path, and scope
@@ -93,16 +91,19 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
 
 
 
-    fun withRoutes( vararg routes: Route): Router  =  withRoutes(routes.asList())
+    fun withRoutes( vararg routes: Route, prefix : String? = null): Router  =  withRoutes(routes.asList(),prefix)
 
 
-    fun withRoutes( routes: List<Route>): Router {
+    fun withRoutes( routes: List<Route>, prefix : String? = null): Router {
 
 
-        val combinedHandler: RoutingHttpHandler = routes(routes.map {
+        var combinedHandler: RoutingHttpHandler = routes(routes.map {
             it.toHandler()
         }.toList())
 
+        prefix?.let {
+           combinedHandler = combinedHandler.withBasePath(it)
+        }
         app = routes(app, combinedHandler)
         return this;
     }
