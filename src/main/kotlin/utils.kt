@@ -2,9 +2,13 @@ package org.aquiles
 
 import com.andreapivetta.kolor.*
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import org.http4k.core.MultipartFormBody
 import org.http4k.core.Request
 import org.http4k.core.Response
+import org.http4k.routing.path
 import kotlin.reflect.KClass
+import kotlin.reflect.KParameter
 import kotlin.reflect.KType
 import kotlin.reflect.javaType
 
@@ -60,10 +64,81 @@ fun formatRoutePrefix(prefix: String?): String {
 }
 
 
+/**
+ *
+ * Deserializes a json to the corresponding type
+ */
+
+@OptIn(ExperimentalStdlibApi::class)
+fun fromJson(jsonMap: Map<String, Any>, kType: KType): Any? {
+    try {
+        val gson = Gson()
+        val json = gson.toJson(jsonMap) // Convert map back to JSON string
+        return gson.fromJson(json, kType.javaType)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
+    }
+}
+
+
+
+/**
+ * Processes parameters from a request and maps them to function parameters
+ */
+ fun processParams(parameters: List<KParameter>, req: Request, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
+    val map = mutableMapOf<KParameter, Any>()
+
+    parameters.forEach { param ->
+        param.name?.let { name ->
+            val res = req.query(name) ?: req.path(name)
+            if (res != null) {
+                castBasedOnType(res, param.type)?.let {
+                    map[param] = it
+                }
+            } else if (req.header("Content-Type") == "application/json") {
 
 
 
 
+                val gson = Gson()
+                val mapType = object : TypeToken<Map<String, Any>>() {}.type
+                val ma = gson.fromJson<Map<String, Any>>(req.bodyString(), mapType)
+                fromJson(ma ,param.type)?.let {
+                    map[param] = it
+                }
+
+            } else{
+
+                val files = handleMultipartForm(req, files = multipartFiles, fields = multipartFields)
+                when {
+                    isListUploadFile(param.type) -> map[param] = files
+                    param.type.classifier == UploadFile::class && files.isNotEmpty() -> map[param] = files[0]
+                }
+            }
+        }
+    }
+
+    return map
+}
+
+
+/**
+ * Handles multipart form data from a request
+ */
+private fun handleMultipartForm(request: Request, fields: Array<String>, files: Array<String>): List<UploadFile> {
+    val multipartForm = MultipartFormBody.from(request)
+    val list = mutableListOf<UploadFile>()
+
+    files.forEach { field ->
+        multipartForm.file(field)?.let { fileInput ->
+            val up = UploadFile(fileInput.filename, fileInput.contentType, fileInput.content)
+            list.add(up)
+        }
+    }
+
+    return list
+}
 fun logRequest(request: Request, response : Response) {
 
     print("INFO:  ".green())

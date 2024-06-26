@@ -1,6 +1,6 @@
 package org.aquiles
 
-abstract  class RoutingScope(val prefix : String? =null) {
+abstract  class RoutingScope() {
 
     private val scopeMiddleware = mutableListOf<HttpMiddleware>()
     private val routeMiddleware = mutableMapOf<String, MutableList<HttpMiddleware>>()

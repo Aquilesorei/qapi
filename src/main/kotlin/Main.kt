@@ -10,7 +10,7 @@ import org.http4k.core.Status.Companion.OK
 
 
 data class  User(val name :String, val age :Int);
-class MyScope(prefix: String? = null) : RoutingScope(prefix) {
+class MyScope() : RoutingScope() {
     private val myFilter = HttpMiddleware {
             next: HttpHandler -> {
             request: Request ->
@@ -31,10 +31,10 @@ class MyScope(prefix: String? = null) : RoutingScope(prefix) {
 
 
     @Post("/register")
-    fun registerUser(user: User) {
+    fun registerUser(user: User): Response {
         println("Registering user ${user.name}")
 
-       //return Response(OK).body("oulalalal\n")
+       return Response(OK).body("oulalalal\n")
     }
 
 
@@ -74,7 +74,8 @@ class MyScope(prefix: String? = null) : RoutingScope(prefix) {
 
 fun main() {
     val router = Router()
-    router.addScope(MyScope(prefix = "/api"))
-    router.staticFiles("/download", directory = "./upload")
-    router.start(9000)
+    router.addScope(MyScope(),prefix = "/api")
+        .withRoutes(myRoutes)
+        .staticFiles("/download", directory = "./upload")
+        .start(9000)
 }

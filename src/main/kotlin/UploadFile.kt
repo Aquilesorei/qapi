@@ -3,6 +3,7 @@ package org.aquiles
 import org.http4k.core.ContentType
 import java.io.File
 import java.io.InputStream
+import kotlin.reflect.KType
 
 
 data class UploadFile(val fileName: String, val contentType: ContentType, val content: InputStream) {
@@ -13,4 +14,17 @@ data class UploadFile(val fileName: String, val contentType: ContentType, val co
         targetFile.createNewFile()
         targetFile.writeBytes(bytes)
     }
+}
+
+
+/**
+ * Checks if a given type is a List of UploadFile
+ */
+ fun isListUploadFile(type: KType): Boolean {
+    if (type.classifier != List::class) {
+        return false
+    }
+
+    val argumentType = type.arguments.firstOrNull()?.type
+    return argumentType != null && argumentType.classifier == UploadFile::class
 }

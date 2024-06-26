@@ -71,95 +71,40 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
     /**
      * Applies global middleware to a handler
      */
-    private fun applyGlobalMiddleware(handler: HttpHandler): HttpHandler {
+/*    private fun applyGlobalMiddleware(handler: HttpHandler): HttpHandler {
         if (globalMiddleware.isEmpty()) return handler
 
         return globalMiddleware.fold(handler) { h, middleware ->
             middleware.then(handler)
         }
-    }
+    }*/
 
     /**
      * Adds a handler for a given method, path, and scope
      */
-    private fun addHandler(handler: HttpHandler, method: Method, path: String, scope: RoutingScope) {
+    private fun addHandler(handler: HttpHandler, method: Method, path: String, scope: RoutingScope, prefix : String? = null) {
 
-        val prefixedPath = "${formatRoutePrefix(scope.prefix)}$path"
+        val prefixedPath = "${formatRoutePrefix(prefix)}$path"
         var h = applyScopeMiddleware(scope.scopeMiddleware(), handler)
         h = applyMiddleware(h, prefixedPath, scope.middleware())
-        h = applyGlobalMiddleware(h)
         app = routes(app, prefixedPath bind method to h)
     }
 
-    /**
-     * Checks if a given type is a List of UploadFile
-     */
-    private fun isListUploadFile(type: KType): Boolean {
-        if (type.classifier != List::class) {
-            return false
-        }
-
-        val argumentType = type.arguments.firstOrNull()?.type
-        return argumentType != null && argumentType.classifier == UploadFile::class
-    }
-
-    /**
-     * Processes parameters from a request and maps them to function parameters
-     */
-    private fun processParams(parameters: List<KParameter>, req: Request, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
-        val map = mutableMapOf<KParameter, Any>()
-
-        parameters.forEach { param ->
-            param.name?.let { name ->
-                val res = req.query(name) ?: req.path(name)
-                if (res != null) {
-                    castBasedOnType(res, param.type)?.let {
-                        map[param] = it
-                    }
-                } else if (req.header("Content-Type") == "application/json") {
 
 
 
-
-                    val gson = Gson()
-                    val mapType = object : TypeToken<Map<String, Any>>() {}.type
-                    val ma = gson.fromJson<Map<String, Any>>(req.bodyString(), mapType)
-                    fromJson(ma ,param.type)?.let {
-                        map[param] = it
-                    }
-  /*                  val className =  "org.aquiles.User"//param.type.classifier.toString() // Assuming you get this from somewhere
-
-                        val userClass = Class.forName(className).kotlin
+    fun withRoutes( vararg routes: Route): Router  =  withRoutes(routes.asList())
 
 
-                        val constructor = userClass.primaryConstructor!!
-                        val arguments = constructor.parameters.associateWith {
-                            ma[it.name!!]?.let {
-
-                                it1 ->
-                                castBasedOnType(it1,it.type)
-                            } // Match parameter names to JSON keys
-                        }
-                    val user = constructor.callBy(arguments)
+    fun withRoutes( routes: List<Route>): Router {
 
 
-                       // println(user)
+        val combinedHandler: RoutingHttpHandler = routes(routes.map {
+            it.toHandler()
+        }.toList())
 
-                        //gson.fromJson(req.bodyString(), param.type::class.java)
-*/
-
-                } else{
-
-                    val files = handleMultipartForm(req, files = multipartFiles, fields = multipartFields)
-                    when {
-                        isListUploadFile(param.type) -> map[param] = files
-                        param.type.classifier == UploadFile::class && files.isNotEmpty() -> map[param] = files[0]
-                    }
-                }
-            }
-        }
-
-        return map
+        app = routes(app, combinedHandler)
+        return this;
     }
 
 
@@ -167,21 +112,10 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
 
 
 
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun fromJson(jsonMap: Map<String, Any>, kType: KType): Any? {
-        try {
-            val gson = Gson()
-            val json = gson.toJson(jsonMap) // Convert map back to JSON string
-            return gson.fromJson(json, kType.javaType)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
-    }
     /**
      * Adds a scope to the router with optional global middleware
      */
-    fun addScope(scope: RoutingScope, globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()) {
+    fun addScope(scope: RoutingScope, globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf(), prefix : String? = null): Router {
         this.globalMiddleware.addAll(globalMiddleware)
 
         val kClass = scope::class
@@ -274,6 +208,8 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
                 }
             }
         }
+
+        return this;
     }
 
 
@@ -294,36 +230,26 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
             }
         }
     }
-    fun staticFiles(path  : String,directory : String){
+    fun staticFiles(path  : String,directory : String): Router {
         val staticFileHandler = static(
             resourceLoader = ResourceLoader.Directory(directory), // Assuming "static" folder in project root
         )
         app = routes(app, path bind Method.GET to staticFileHandler)
+        return this;
     }
 
 
 
-    /**
-     * Handles multipart form data from a request
-     */
-    private fun handleMultipartForm(request: Request, fields: Array<String>, files: Array<String>): List<UploadFile> {
-        val multipartForm = MultipartFormBody.from(request)
-        val list = mutableListOf<UploadFile>()
 
-        files.forEach { field ->
-            multipartForm.file(field)?.let { fileInput ->
-                val up = UploadFile(fileInput.filename, fileInput.contentType, fileInput.content)
-                list.add(up)
-            }
-        }
-
-        return list
-    }
 
     /**
      * Starts the HTTP server on the given port
      */
     fun start(port: Int) {
+
+          for(f in  globalMiddleware){
+              app = app.withFilter(f);
+          }
         server = app.asServer(Undertow(port))
         server.start()
         println("Server started on port http://localhost:$port/")
