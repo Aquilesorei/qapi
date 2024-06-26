@@ -2,12 +2,14 @@ package org.aquiles
 
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-import io.undertow.util.BadRequestException
+
+import org.http4k.core.HttpHandler
+import org.http4k.core.Request
+import org.http4k.core.Response
 import org.http4k.core.Status.Companion.OK
 
-import org.http4k.core.*
-import org.http4k.routing.path
 
+data class  User(val name :String, val age :Int);
 class MyScope(prefix: String? = null) : RoutingScope(prefix) {
     private val myFilter = HttpMiddleware {
             next: HttpHandler -> {
@@ -24,6 +26,15 @@ class MyScope(prefix: String? = null) : RoutingScope(prefix) {
 
     init {
         addScopeMiddleware(myFilter)
+    }
+
+
+
+    @Post("/register")
+    fun registerUser(user: User) {
+        println("Registering user ${user.name}")
+
+       //return Response(OK).body("oulalalal\n")
     }
 
 
@@ -44,7 +55,7 @@ class MyScope(prefix: String? = null) : RoutingScope(prefix) {
     fun upload(files: List<UploadFile>): Response {
 
 
-        val builder = StringBuilder();
+        val builder = StringBuilder()
         for (f in files) {
             builder.append(f.fileName).append(" ")
             f.write("./upload/")

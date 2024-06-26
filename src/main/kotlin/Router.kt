@@ -1,17 +1,16 @@
 package org.aquiles
 
 
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import io.undertow.util.BadRequestException
 import org.http4k.server.Http4kServer
 import org.http4k.server.Undertow
 import org.http4k.server.asServer
 import kotlin.reflect.full.findAnnotation
 import org.http4k.core.*
 import org.http4k.routing.*
-import java.nio.file.Paths
-import kotlin.reflect.KCallable
-import kotlin.reflect.KClass
-import kotlin.reflect.KParameter
-import kotlin.reflect.KType
+import kotlin.reflect.*
 import kotlin.reflect.full.instanceParameter
 
 class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()) {
@@ -113,27 +112,48 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
         parameters.forEach { param ->
             param.name?.let { name ->
                 val res = req.query(name) ?: req.path(name)
-
                 if (res != null) {
                     castBasedOnType(res, param.type)?.let {
                         map[param] = it
                     }
-                } else {
-                    val files = handleMultipartForm(req, files = multipartFiles, fields = multipartFields)
-                    if (param.type.classifier is KClass<*>) {
-                        when (param.type.classifier) {
-                            List::class -> {
-                                if (isListUploadFile(param.type)) {
-                                    map[param] = files
-                                }
-                            }
-                            UploadFile::class -> {
-                                if (files.isNotEmpty()) {
-                                    map[param] = files[0]
-                                }
-                            }
-                            else -> {}
+                } else if (req.header("Content-Type") == "application/json") {
+
+
+
+
+                    val gson = Gson()
+                    val mapType = object : TypeToken<Map<String, Any>>() {}.type
+                    val ma = gson.fromJson<Map<String, Any>>(req.bodyString(), mapType)
+                    fromJson(ma ,param.type)?.let {
+                        map[param] = it
+                    }
+  /*                  val className =  "org.aquiles.User"//param.type.classifier.toString() // Assuming you get this from somewhere
+
+                        val userClass = Class.forName(className).kotlin
+
+
+                        val constructor = userClass.primaryConstructor!!
+                        val arguments = constructor.parameters.associateWith {
+                            ma[it.name!!]?.let {
+
+                                it1 ->
+                                castBasedOnType(it1,it.type)
+                            } // Match parameter names to JSON keys
                         }
+                    val user = constructor.callBy(arguments)
+
+
+                       // println(user)
+
+                        //gson.fromJson(req.bodyString(), param.type::class.java)
+*/
+
+                } else{
+
+                    val files = handleMultipartForm(req, files = multipartFiles, fields = multipartFields)
+                    when {
+                        isListUploadFile(param.type) -> map[param] = files
+                        param.type.classifier == UploadFile::class && files.isNotEmpty() -> map[param] = files[0]
                     }
                 }
             }
@@ -142,6 +162,22 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
         return map
     }
 
+
+
+
+
+
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun fromJson(jsonMap: Map<String, Any>, kType: KType): Any? {
+        try {
+            val gson = Gson()
+            val json = gson.toJson(jsonMap) // Convert map back to JSON string
+            return gson.fromJson(json, kType.javaType)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
     /**
      * Adds a scope to the router with optional global middleware
      */
@@ -175,11 +211,19 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
                             params[function.instanceParameter!!] = scope
                             try {
                                 val res = function.callBy(params)
-                                res as Response
+                                try {
+                                    val casted =res as Response
+                                    casted
+                                }catch (e : ClassCastException){
+                                    println("Internal server error: Please ensure proper handling and return of Response in the handler function '${function.name}' within the scope '${scope::class.simpleName}' \n")
+                                    e.printStackTrace()
+                                    Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
+                                }
+
                             }catch (e : Exception){
 
                                 e.printStackTrace()
-                                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
+                                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error\n")
                             }
                         }
                         addHandler(functionHandler, Method.POST, path, scope = scope)
@@ -195,6 +239,7 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
                        // println("Found DELETE endpoint: $path on ${function.name}")
                         val functionHandler =  createFunctionHandler(scope,function)
                         addHandler(functionHandler, Method.DELETE, path, scope = scope)
+
                     }
                     function.findAnnotation<Patch>() != null -> {
                         val path = function.findAnnotation<Patch>()!!.path
@@ -240,6 +285,9 @@ class Router(vararg list: Route, private var globalMiddleware: MutableSet<HttpMi
                 params[function.instanceParameter!!] = scope
                 val res = function.callBy(params)
                 res as Response
+            } catch (e: BadRequestException) {
+                e.printStackTrace();
+                Response(Status.BAD_REQUEST).body(e.message ?: "Bad Request")
             } catch (e: Exception) {
                 e.printStackTrace()
                 Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")

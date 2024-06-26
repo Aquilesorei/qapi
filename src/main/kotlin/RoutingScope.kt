@@ -24,11 +24,5 @@ abstract  class RoutingScope(val prefix : String? =null) {
    open fun middleware(): Map<String ,List<HttpMiddleware>>{
        return  routeMiddleware;
    }
-    open fun  toRouter(): Router {
-
-        val router = Router()
-        router.addScope(this)
-        return router
-    }
 
 }
