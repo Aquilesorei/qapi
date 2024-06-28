@@ -1,6 +1,7 @@
 package org.aquiles
 
-import org.http4k.core.Method
+import org.aquiles.core.Method
+
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

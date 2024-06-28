@@ -3,24 +3,22 @@ package org.aquiles
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 
-import org.http4k.core.HttpHandler
-import org.http4k.core.Request
-import org.http4k.core.Response
-import org.http4k.core.Status.Companion.OK
+import kotlinx.coroutines.delay
+import  org.aquiles.core.HttpStatus
+import org.aquiles.core.*
 
-
-data class  User(val name :String, val age :Int);
-class MyScope() : RoutingScope() {
-    private val myFilter = HttpMiddleware {
-            next: HttpHandler -> {
-            request: Request ->
+ val myFilter = HttpMiddleware { next: HttpHandler ->
+    { request: Request ->
         val start = System.currentTimeMillis()
         val response = next(request)
         val latency = System.currentTimeMillis() - start
         println("I took $latency ms")
         response
     }
-    }
+}
+data class  User(val name :String, val age :Int);
+class MyScope : RoutingScope() {
+
 
 
 
@@ -30,29 +28,41 @@ class MyScope() : RoutingScope() {
 
 
 
+    @Get("/blabla")
+    fun blabal(): HttpResponse {
+        return HttpResponse.Ok().body("blablalalal")
+    }
+
+
+    @Get("/delay")
+    suspend fun delayedResponse(): HttpResponse {
+        delay(1000) // Simulate a delay
+        return HttpResponse(HttpStatus.OK).body("Delayed response after 1 second")
+    }
+
     @Post("/register")
-    fun registerUser(user: User): Response {
+    fun registerUser(user: User): HttpResponse {
         println("Registering user ${user.name}")
 
-       return Response(OK).body("oulalalal\n")
+       return HttpResponse.Ok().body("oulalalal\n")
     }
 
 
     @Get("/add/{a}/{b}")
-    fun add(a: Int, b: Int): Response {
+    fun add(a: Int, b: Int): HttpResponse {
         if(a == 5) {
             throw Exception("they not like us")
         }
-        return Response(OK).body("$a + $b = ${a + b}")
+        return HttpResponse(HttpStatus.OK).body("$a + $b = ${a + b}")
     }
 
     @Get("/hello/{lastname}/{name}")
-    fun hello(lastname: String, name: String): Response {
-        return Response(OK).body("Hello, $name you are $lastname")
+    fun hello(lastname: String, name: String): HttpResponse {
+        return HttpResponse(HttpStatus.OK)
     }
 
     @Post("/upload", multipartFiles = ["file", "file1"])
-    fun upload(files: List<UploadFile>): Response {
+    fun upload(files: List<UploadFile>): HttpResponse {
 
 
         val builder = StringBuilder()
@@ -61,7 +71,8 @@ class MyScope() : RoutingScope() {
             f.write("./upload/")
         }
 
-        return Response(OK).body("received $builder")
+
+        return HttpResponse(HttpStatus.OK).body("received $builder")
     }
 
 
@@ -73,9 +84,11 @@ class MyScope() : RoutingScope() {
 
 
 fun main() {
+
+
     val router = Router()
     router.addScope(MyScope(),prefix = "/api")
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
-        .start(9000)
+        .start(Undertow(9000))
 }

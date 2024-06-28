@@ -1,17 +1,23 @@
 package org.aquiles
 
 
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+
 import io.undertow.util.BadRequestException
-import org.http4k.server.Http4kServer
-import org.http4k.server.Undertow
+
+
 import org.http4k.server.asServer
-import kotlin.reflect.full.findAnnotation
+
 import org.http4k.core.*
 import org.http4k.routing.*
+import org.http4k.server.ServerConfig
+//kotlin reflect
 import kotlin.reflect.*
+import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.instanceParameter
+import kotlin.reflect.full.findAnnotation
+
+import kotlinx.coroutines.*
+import org.http4k.server.Http4kServer
 
 class Router() {
 
@@ -20,7 +26,7 @@ class Router() {
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
 
 
-
+    private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
     init {
         app = routes(emptyList<Route>().map {
             it.toHandler()
@@ -72,17 +78,19 @@ class Router() {
      *
      * adds a global middleware
      */
-     fun global(middleware  : HttpMiddleware): Router {
+     fun addMiddleware(middleware  : HttpMiddleware): Router {
          globalMiddleware.add(middleware);
         return this
      }
 
+
     /**
      * Adds a handler for a given method, path, and scope
      */
-    private fun addHandler(handler: HttpHandler, method: Method, path: String, scope: RoutingScope, prefix : String? = null) {
+    private fun addHandler(handler: HttpHandler, method: Method, path: String, scope: RoutingScope, prefix : String?) {
 
         val prefixedPath = "${formatRoutePrefix(prefix)}$path"
+
         var h = applyScopeMiddleware(scope.scopeMiddleware(), handler)
         h = applyMiddleware(h, prefixedPath, scope.middleware())
         app = routes(app, prefixedPath bind method to h)
@@ -119,95 +127,101 @@ class Router() {
     fun addScope(scope: RoutingScope, globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf(), prefix : String? = null): Router {
         this.globalMiddleware.addAll(globalMiddleware)
 
-        val kClass = scope::class
-        for (function in kClass.members) {
-            val endpointAnnotation = function.findAnnotation<EndPoint>()
-            if (endpointAnnotation != null) {
 
-                val functionHandler = createFunctionHandler(scope,function)
-                addHandler(functionHandler, Method.POST, endpointAnnotation.path, scope = scope)
-            } else {
-                when {
-                    function.findAnnotation<Get>() != null -> {
-                        val anon = function.findAnnotation<Get>()!!
-                        val path = anon.path
-                        //println("Found GET endpoint: $path on ${function.name}")
-                        val functionHandler =  createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.GET, anon.path, scope = scope)
-                    }
-                    function.findAnnotation<Post>() != null -> {
-                        val anon = function.findAnnotation<Post>()!!
-                        val path = anon.path
-                        val multipartFiles = anon.multipartFiles
-                        val multipartFields = anon.multipartFields
-                      //  println("Found POST endpoint: $path on ${function.name}")
-                        val functionHandler = { req: Request ->
-                            val params = processParams(function.parameters, req, multipartFields = multipartFields, multipartFiles = multipartFiles)
-                            params[function.instanceParameter!!] = scope
-                            try {
-                                val res = function.callBy(params)
-                                try {
-                                    val casted =res as Response
-                                    casted
-                                }catch (e : ClassCastException){
-                                    println("Internal server error: Please ensure proper handling and return of Response in the handler function '${function.name}' within the scope '${scope::class.simpleName}' \n")
-                                    e.printStackTrace()
-                                    Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
-                                }
+       val  job = coroutine.launch {val kClass = scope::class
+            for (function in kClass.members) {
+                val endpointAnnotation = function.findAnnotation<EndPoint>()
+                if (endpointAnnotation != null) {
 
-                            }catch (e : Exception){
-
-                                e.printStackTrace()
-                                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error\n")
-                            }
+                    val functionHandler = createFunctionHandler(scope,function)
+                    addHandler(functionHandler, endpointAnnotation.method, endpointAnnotation.path, scope = scope,prefix=prefix)
+                } else {
+                    when {
+                        function.findAnnotation<Get>() != null -> {
+                            val anon = function.findAnnotation<Get>()!!
+                            val path = anon.path
+                            //println("Found GET endpoint: $path on ${function.name}")
+                            val functionHandler =  createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.GET, anon.path, scope = scope,prefix=prefix)
                         }
-                        addHandler(functionHandler, Method.POST, path, scope = scope)
-                    }
-                    function.findAnnotation<Put>() != null -> {
-                        val path = function.findAnnotation<Put>()!!.path
-                       // println("Found PUT endpoint: $path on ${function.name}")
-                        val functionHandler = createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.PUT, path, scope = scope)
-                    }
-                    function.findAnnotation<Delete>() != null -> {
-                        val path = function.findAnnotation<Delete>()!!.path
-                       // println("Found DELETE endpoint: $path on ${function.name}")
-                        val functionHandler =  createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.DELETE, path, scope = scope)
+                        function.findAnnotation<Post>() != null -> {
+                            val anon = function.findAnnotation<Post>()!!
+                            val path = anon.path
+                            val multipartFiles = anon.multipartFiles
+                            val multipartFields = anon.multipartFields
+                            //  println("Found POST endpoint: $path on ${function.name}")
+                            val functionHandler = { req: Request ->
+                                val params = processParams(function.parameters, req, multipartFields = multipartFields, multipartFiles = multipartFiles)
+                                params[function.instanceParameter!!] = scope
+                                try {
+                                    val res = function.callBy(params)
+                                    try {
+                                        val casted =res as Response
+                                        casted
+                                    }catch (e : ClassCastException){
+                                        println("Internal server error: Please ensure proper handling and return of Response in the handler function '${function.name}' within the scope '${scope::class.simpleName}' \n")
+                                        e.printStackTrace()
+                                        Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
+                                    }
 
-                    }
-                    function.findAnnotation<Patch>() != null -> {
-                        val path = function.findAnnotation<Patch>()!!.path
-                        //println("Found PATCH endpoint: $path on ${function.name}")
-                        val functionHandler = createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.PATCH, path, scope = scope)
-                    }
-                    function.findAnnotation<Head>() != null -> {
-                        val path = function.findAnnotation<Head>()!!.path
-                        //println("Found HEAD endpoint: $path on ${function.name}")
-                        val functionHandler =  createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.HEAD, path, scope = scope)
-                    }
-                    function.findAnnotation<Options>() != null -> {
-                        val path = function.findAnnotation<Options>()!!.path
-                        //println("Found OPTIONS endpoint: $path on ${function.name}")
-                        val functionHandler =  createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.OPTIONS, path, scope = scope)
-                    }
-                    function.findAnnotation<Trace>() != null -> {
-                        val path = function.findAnnotation<Trace>()!!.path
-                        //println("Found TRACE endpoint: $path on ${function.name}")
-                        val functionHandler =  createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.TRACE, path, scope = scope)
-                    }
-                    function.findAnnotation<Purge>() != null -> {
-                        val path = function.findAnnotation<Purge>()!!.path
-                       // println("Found PURGE endpoint: $path on ${function.name}")
-                        val functionHandler =  createFunctionHandler(scope,function)
-                        addHandler(functionHandler, Method.PURGE, path, scope = scope)
+                                }catch (e : Exception){
+
+                                    e.printStackTrace()
+                                    Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error\n")
+                                }
+                            }
+                            addHandler(functionHandler, Method.POST, path, scope = scope,prefix=prefix)
+                        }
+                        function.findAnnotation<Put>() != null -> {
+                            val path = function.findAnnotation<Put>()!!.path
+                            // println("Found PUT endpoint: $path on ${function.name}")
+                            val functionHandler = createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.PUT, path, scope = scope,prefix=prefix)
+                        }
+                        function.findAnnotation<Delete>() != null -> {
+                            val path = function.findAnnotation<Delete>()!!.path
+                            // println("Found DELETE endpoint: $path on ${function.name}")
+                            val functionHandler =  createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.DELETE, path, scope = scope,prefix=prefix)
+
+                        }
+                        function.findAnnotation<Patch>() != null -> {
+                            val path = function.findAnnotation<Patch>()!!.path
+                            //println("Found PATCH endpoint: $path on ${function.name}")
+                            val functionHandler = createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.PATCH, path, scope = scope,prefix=prefix)
+                        }
+                        function.findAnnotation<Head>() != null -> {
+                            val path = function.findAnnotation<Head>()!!.path
+                            //println("Found HEAD endpoint: $path on ${function.name}")
+                            val functionHandler =  createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.HEAD, path, scope = scope,prefix=prefix)
+                        }
+                        function.findAnnotation<Options>() != null -> {
+                            val path = function.findAnnotation<Options>()!!.path
+                            //println("Found OPTIONS endpoint: $path on ${function.name}")
+                            val functionHandler =  createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.OPTIONS, path, scope = scope,prefix=prefix)
+                        }
+                        function.findAnnotation<Trace>() != null -> {
+                            val path = function.findAnnotation<Trace>()!!.path
+                            //println("Found TRACE endpoint: $path on ${function.name}")
+                            val functionHandler =  createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.TRACE, path, scope = scope,prefix=prefix)
+                        }
+                        function.findAnnotation<Purge>() != null -> {
+                            val path = function.findAnnotation<Purge>()!!.path
+                            // println("Found PURGE endpoint: $path on ${function.name}")
+                            val functionHandler =  createFunctionHandler(scope,function)
+                            addHandler(functionHandler, Method.PURGE, path, scope = scope,prefix=prefix)
+                        }
                     }
                 }
             }
+        }
+
+        runBlocking {
+            job.join();
         }
 
         return this;
@@ -215,22 +229,32 @@ class Router() {
 
 
 
+
     private fun createFunctionHandler(scope: RoutingScope, function: KCallable<*>): HttpHandler {
         return { req: Request ->
-            try {
-                val params = processParams(function.parameters, req)
-                params[function.instanceParameter!!] = scope
-                val res = function.callBy(params)
-                res as Response
-            } catch (e: BadRequestException) {
-                e.printStackTrace();
-                Response(Status.BAD_REQUEST).body(e.message ?: "Bad Request")
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
+            val responseCompletable = CompletableDeferred<Response>()
+
+            coroutine.launch(Dispatchers.IO) {
+                try {
+                    val params = processParams(function.parameters, req)
+                    params[function.instanceParameter!!] = scope
+                    val res = if (function.isSuspend) function.callSuspendBy(params) else function.callBy(params)
+                    responseCompletable.complete(res as Response)
+                } catch (e: BadRequestException) {
+                    e.printStackTrace()
+                    responseCompletable.complete(Response(Status.BAD_REQUEST).body(e.message ?: "Bad Request"))
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    responseCompletable.complete(Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error"))
+                }
+            }
+
+            runBlocking {
+                responseCompletable.await()
             }
         }
     }
+
     fun staticFiles(path  : String,directory : String): Router {
         val staticFileHandler = static(
             resourceLoader = ResourceLoader.Directory(directory), // Assuming "static" folder in project root
@@ -246,14 +270,14 @@ class Router() {
     /**
      * Starts the HTTP server on the given port
      */
-    fun start(port: Int) {
+    fun start( config: ServerConfig) {
 
           for(f in  globalMiddleware){
               app = app.withFilter(f);
           }
-        server = app.asServer(Undertow(port))
+        server = app.asServer(config)
         server.start()
-        println("Server started on port http://localhost:$port/")
+        println("Server started at http://localhost:${server.port()}/")
         println("Press Enter to stop the server.")
         readlnOrNull()
 
@@ -264,5 +288,12 @@ class Router() {
     /**
      * Stops the HTTP server
      */
-    fun stop() = server.stop()
+    fun stop() {
+        server.stop()
+        coroutine.cancel()
+    }
+
+    fun graceFullShutDown(){
+        server.stop()
+    }
 }

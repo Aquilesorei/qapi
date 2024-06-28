@@ -1,5 +1,6 @@
 package org.aquiles
 
+import org.aquiles.core.jsonResponse
 import org.http4k.core.*
 import org.http4k.core.Method.*
 import org.http4k.core.Status.Companion.OK
@@ -97,6 +98,7 @@ val  myRoutes = listOf(
                         middlewares = listOf(),
                         handler = {req : Request->
 
+
                             return@Route  Response(OK).body("Hello World subroute 2")
                         }
                     ),
@@ -110,12 +112,14 @@ val  myRoutes = listOf(
 
             Route(
                 method = GET,
-                path = "/wtf2",
+                path = "/getUser",
                 childRoutes = listOf(),
-                middlewares = listOf(),
+                middlewares = listOf(
+                    myFilter
+                ),
                 handler = {req : Request->
 
-                    return@Route  Response(OK).body("Hello World subroute 2")
+                    return@Route  Response.Ok().jsonResponse(User("Achille",23))
                 }
             ),
         ),
