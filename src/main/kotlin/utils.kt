@@ -152,3 +152,28 @@ fun logRequest(request: Request, response : Response) {
 
 
 }
+
+
+fun convertToSentenceCase(input: String): String {
+    // Normalize separators and handle edge cases
+    val normalized = input.trim().replace("_", "-")
+
+    // Split into words based on case changes or separators
+    val words = normalized.split(Regex("(?<=[a-z])(?=[A-Z])|-")).filter { it.isNotEmpty() }
+
+    // Capitalize the first letter of each word and make the rest lowercase
+    val capitalizedWords = words.map { it.toLowerCase().capitalize() }
+
+    // Join words back into a sentence with spaces
+    return capitalizedWords.joinToString(" ")
+}
+
+/*
+// Test cases
+val examples = listOf("addHandler", "AddHandler", "add_handler", "getUsers", "get-users", "", "  ", "multiple--separators")
+
+examples.forEach { input ->
+    val result = convertToSentenceCase(input)
+    println("$input -> $result")
+}
+*/

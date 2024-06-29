@@ -29,15 +29,15 @@ class MyScope : RoutingScope() {
 
 
     @Get("/blabla")
-    fun blabal(): HttpResponse {
-        return HttpResponse.Ok().body("blablalalal")
+    fun blabal(): Int {
+        return  42
     }
 
 
     @Get("/delay")
     suspend fun delayedResponse(): HttpResponse {
         delay(1000) // Simulate a delay
-        return HttpResponse(HttpStatus.OK).body("Delayed response after 1 second")
+        return HttpResponse(HttpStatus.OK)//.body("Delayed response after 1 second")
     }
 
     @Post("/register")
@@ -86,9 +86,12 @@ class MyScope : RoutingScope() {
 fun main() {
 
 
+
     val router = Router()
     router.addScope(MyScope(),prefix = "/api")
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
         .start(Undertow(9000))
+
+  //  testIt()
 }

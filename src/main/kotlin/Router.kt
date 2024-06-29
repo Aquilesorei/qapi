@@ -2,6 +2,7 @@ package org.aquiles
 
 
 
+import io.ktor.http.*
 import io.undertow.util.BadRequestException
 
 
@@ -17,6 +18,13 @@ import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.findAnnotation
 
 import kotlinx.coroutines.*
+import org.aquiles.core.HttpResponse
+import org.aquiles.core.HttpStatus
+import org.aquiles.core.jsonResponse
+import org.aquiles.serialization.handleResponse
+import org.http4k.contract.ContractRoute
+import org.http4k.contract.ui.redocLite
+import org.http4k.contract.ui.swaggerUiLite
 import org.http4k.server.Http4kServer
 
 class Router() {
@@ -24,7 +32,7 @@ class Router() {
     private lateinit var server : Http4kServer
     private var app: RoutingHttpHandler
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
-
+     val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
 
     private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
     init {
@@ -87,34 +95,24 @@ class Router() {
     /**
      * Adds a handler for a given method, path, and scope
      */
-    private fun addHandler(handler: HttpHandler, method: Method, path: String, scope: RoutingScope, prefix : String?) {
+    private fun addHandler(function: KCallable<*>,method: Method, path: String, scope: RoutingScope, prefix : String?,multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()) {
 
+
+        val handler: HttpHandler = createFunctionHandler(scope,function,multipartFiles=multipartFiles, multipartFields = multipartFields)
         val prefixedPath = "${formatRoutePrefix(prefix)}$path"
 
         var h = applyScopeMiddleware(scope.scopeMiddleware(), handler)
         h = applyMiddleware(h, prefixedPath, scope.middleware())
-        app = routes(app, prefixedPath bind method to h)
+
+        val contractRoute = createContractHandler(
+            summary = convertToSentenceCase(function.name),
+            path  = prefixedPath,
+            handler = handler,
+            method = method
+        )
+        employementContracts.add(contractRoute)
     }
 
-
-
-
-    fun withRoutes( vararg routes: Route, prefix : String? = null): Router  =  withRoutes(routes.asList(),prefix)
-
-
-    fun withRoutes( routes: List<Route>, prefix : String? = null): Router {
-
-
-        var combinedHandler: RoutingHttpHandler = routes(routes.map {
-            it.toHandler()
-        }.toList())
-
-        prefix?.let {
-           combinedHandler = combinedHandler.withBasePath(it)
-        }
-        app = routes(app, combinedHandler)
-        return this;
-    }
 
 
 
@@ -133,16 +131,15 @@ class Router() {
                 val endpointAnnotation = function.findAnnotation<EndPoint>()
                 if (endpointAnnotation != null) {
 
-                    val functionHandler = createFunctionHandler(scope,function)
-                    addHandler(functionHandler, endpointAnnotation.method, endpointAnnotation.path, scope = scope,prefix=prefix)
+                    addHandler(function, endpointAnnotation.method, endpointAnnotation.path, scope = scope,prefix=prefix)
                 } else {
                     when {
                         function.findAnnotation<Get>() != null -> {
                             val anon = function.findAnnotation<Get>()!!
                             val path = anon.path
                             //println("Found GET endpoint: $path on ${function.name}")
-                            val functionHandler =  createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.GET, anon.path, scope = scope,prefix=prefix)
+
+                            addHandler(function, Method.GET, anon.path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Post>() != null -> {
                             val anon = function.findAnnotation<Post>()!!
@@ -150,70 +147,48 @@ class Router() {
                             val multipartFiles = anon.multipartFiles
                             val multipartFields = anon.multipartFields
                             //  println("Found POST endpoint: $path on ${function.name}")
-                            val functionHandler = { req: Request ->
-                                val params = processParams(function.parameters, req, multipartFields = multipartFields, multipartFiles = multipartFiles)
-                                params[function.instanceParameter!!] = scope
-                                try {
-                                    val res = function.callBy(params)
-                                    try {
-                                        val casted =res as Response
-                                        casted
-                                    }catch (e : ClassCastException){
-                                        println("Internal server error: Please ensure proper handling and return of Response in the handler function '${function.name}' within the scope '${scope::class.simpleName}' \n")
-                                        e.printStackTrace()
-                                        Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error")
-                                    }
-
-                                }catch (e : Exception){
-
-                                    e.printStackTrace()
-                                    Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error\n")
-                                }
-                            }
-                            addHandler(functionHandler, Method.POST, path, scope = scope,prefix=prefix)
+                            addHandler(function, Method.POST, path, scope = scope,prefix=prefix,multipartFields=multipartFields,multipartFiles=multipartFiles)
                         }
                         function.findAnnotation<Put>() != null -> {
                             val path = function.findAnnotation<Put>()!!.path
                             // println("Found PUT endpoint: $path on ${function.name}")
-                            val functionHandler = createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.PUT, path, scope = scope,prefix=prefix)
+                            addHandler(function, Method.PUT, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Delete>() != null -> {
                             val path = function.findAnnotation<Delete>()!!.path
                             // println("Found DELETE endpoint: $path on ${function.name}")
-                            val functionHandler =  createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.DELETE, path, scope = scope,prefix=prefix)
+
+                            addHandler(function, Method.DELETE, path, scope = scope,prefix=prefix)
 
                         }
                         function.findAnnotation<Patch>() != null -> {
                             val path = function.findAnnotation<Patch>()!!.path
                             //println("Found PATCH endpoint: $path on ${function.name}")
-                            val functionHandler = createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.PATCH, path, scope = scope,prefix=prefix)
+                            addHandler(function, Method.PATCH, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Head>() != null -> {
                             val path = function.findAnnotation<Head>()!!.path
                             //println("Found HEAD endpoint: $path on ${function.name}")
-                            val functionHandler =  createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.HEAD, path, scope = scope,prefix=prefix)
+
+                            addHandler(function, Method.HEAD, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Options>() != null -> {
                             val path = function.findAnnotation<Options>()!!.path
                             //println("Found OPTIONS endpoint: $path on ${function.name}")
-                            val functionHandler =  createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.OPTIONS, path, scope = scope,prefix=prefix)
+
+                            addHandler(function, Method.OPTIONS, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Trace>() != null -> {
                             val path = function.findAnnotation<Trace>()!!.path
                             //println("Found TRACE endpoint: $path on ${function.name}")
-                            val functionHandler =  createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.TRACE, path, scope = scope,prefix=prefix)
+
+                            addHandler(function, Method.TRACE, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Purge>() != null -> {
                             val path = function.findAnnotation<Purge>()!!.path
                             // println("Found PURGE endpoint: $path on ${function.name}")
-                            val functionHandler =  createFunctionHandler(scope,function)
-                            addHandler(functionHandler, Method.PURGE, path, scope = scope,prefix=prefix)
+
+                            addHandler(function, Method.PURGE, path, scope = scope,prefix=prefix)
                         }
                     }
                 }
@@ -229,17 +204,39 @@ class Router() {
 
 
 
+    fun withRoutes( vararg routes: Route, prefix : String? = null): Router  =  withRoutes(routes.asList(),prefix)
 
-    private fun createFunctionHandler(scope: RoutingScope, function: KCallable<*>): HttpHandler {
+
+    fun withRoutes( routes: List<Route>, prefix : String? = null): Router {
+
+
+        var combinedHandler: RoutingHttpHandler = routes(routes.map {
+            it.toHandler()
+        }.toList())
+
+        prefix?.let {
+            combinedHandler = combinedHandler.withBasePath(it)
+        }
+        app = routes(app, combinedHandler)
+        return this;
+    }
+
+
+    private fun createFunctionHandler(
+        scope: RoutingScope,
+        function: KCallable<*>,
+        multipartFields: Array<String> = arrayOf(),
+        multipartFiles: Array<String> = arrayOf(),
+    ): HttpHandler {
         return { req: Request ->
             val responseCompletable = CompletableDeferred<Response>()
 
             coroutine.launch(Dispatchers.IO) {
                 try {
-                    val params = processParams(function.parameters, req)
+                    val params = processParams(function.parameters, req, multipartFields, multipartFiles)
                     params[function.instanceParameter!!] = scope
                     val res = if (function.isSuspend) function.callSuspendBy(params) else function.callBy(params)
-                    responseCompletable.complete(res as Response)
+                    responseCompletable.complete(handleResponse(res))
                 } catch (e: BadRequestException) {
                     e.printStackTrace()
                     responseCompletable.complete(Response(Status.BAD_REQUEST).body(e.message ?: "Bad Request"))
@@ -254,6 +251,7 @@ class Router() {
             }
         }
     }
+
 
     fun staticFiles(path  : String,directory : String): Router {
         val staticFileHandler = static(
@@ -275,6 +273,26 @@ class Router() {
           for(f in  globalMiddleware){
               app = app.withFilter(f);
           }
+
+        app =  routes(
+            app,
+            // bind the API and OpenApi description off of root
+            createAll(employementContracts),
+
+            // bind Swagger UI to the root path
+            swaggerUiLite {
+                url = "/openapi.json"
+                pageTitle = "QuickAPI - Swagger UI"
+                persistAuthorization = true
+            },
+
+            // Bind Redoc to another path
+            "/redoc" bind redocLite {
+                url = "/openapi.json"
+                pageTitle = "QuickAPI - Redoc"
+                options["disable-search"] = "true"
+            }
+        )
         server = app.asServer(config)
         server.start()
         println("Server started at http://localhost:${server.port()}/")

@@ -45,6 +45,8 @@ dependencies {
     implementation("org.http4k:http4k-server-websocket")
     implementation("org.http4k:http4k-client-apache")
     implementation("org.http4k:http4k-multipart")
+    implementation("org.http4k:http4k-contract")
+    implementation("org.http4k:http4k-format-jackson")
     implementation("com.google.code.gson:gson:2.8.9")
     implementation(kotlin("reflect"))
     implementation("org.jboss.xnio:xnio-nio:3.8.16.Final")

@@ -61,17 +61,7 @@ class Route(
                 middlewares = middlewares,
                 handler = handler
             );
-         /*   var  h = path bind  method to handler;
 
-            lateinit var  finalHandler  : HttpHandler
-
-            val  list = emptyList<HttpHandler>().toMutableList()
-           for(ch in  childRoutes){
-               list.add(h bind  ch.toHandler())
-           }
-
-
-           return routes(list);*/
         }
     }
 }
