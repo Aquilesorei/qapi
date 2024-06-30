@@ -5,7 +5,7 @@ import org.aquiles.core.Method
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class EndPoint(val method: Method, val path: String,)
+annotation class EndPoint(val method: Method, val path: String,val contentType: String = "application/json")
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

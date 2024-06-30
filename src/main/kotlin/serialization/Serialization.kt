@@ -1,11 +1,12 @@
 package org.aquiles.serialization
 
+import com.google.gson.Gson
 import org.aquiles.core.HttpResponse
 import org.aquiles.core.jsonResponse
 
 import org.http4k.core.Response
-
-
+import kotlin.reflect.KType
+import kotlin.reflect.javaType
 
 
 fun handleResponse(res: Any?): Response {
@@ -48,5 +49,25 @@ private fun handleCustomResponse(res: Any): Response {
             // Handle other types if needed
             HttpResponse.Ok().jsonResponse(res) // Placeholder
         }
+    }
+}
+
+
+
+
+/**
+ *
+ * Deserializes a json to the corresponding type
+ */
+
+@OptIn(ExperimentalStdlibApi::class)
+fun fromJson(jsonMap: Map<String, Any>, kType: KType): Any? {
+    try {
+        val gson = Gson()
+        val json = gson.toJson(jsonMap) // Convert map back to JSON string
+        return gson.fromJson(json, kType.javaType)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
     }
 }

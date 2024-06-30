@@ -18,6 +18,7 @@ import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.findAnnotation
 
 import kotlinx.coroutines.*
+import org.aquiles.core.ContentType
 import org.aquiles.core.HttpResponse
 import org.aquiles.core.HttpStatus
 import org.aquiles.core.jsonResponse
@@ -32,7 +33,7 @@ class Router() {
     private lateinit var server : Http4kServer
     private var app: RoutingHttpHandler
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
-     val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
+     private val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
 
     private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
     init {
@@ -104,11 +105,15 @@ class Router() {
         var h = applyScopeMiddleware(scope.scopeMiddleware(), handler)
         h = applyMiddleware(h, prefixedPath, scope.middleware())
 
+
+
+
         val contractRoute = createContractHandler(
             summary = convertToSentenceCase(function.name),
             path  = prefixedPath,
-            handler = handler,
-            method = method
+            handler = h,
+            method = method,
+            contentType = ContentType.TEXT_PLAIN
         )
         employementContracts.add(contractRoute)
     }
