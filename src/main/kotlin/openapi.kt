@@ -1,30 +1,26 @@
 package org.aquiles
 
+import org.aquiles.core.*
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.contract
 import org.http4k.contract.meta
 import org.http4k.contract.openapi.ApiInfo
 import org.http4k.contract.openapi.v3.OpenApi3
+import org.http4k.core.Body
 import org.http4k.lens.string
 
-import org.http4k.contract.ui.redocLite
-import org.http4k.contract.ui.swaggerUiLite
-import org.http4k.core.*
-import org.http4k.routing.bind
-import org.http4k.routing.routes
-import org.http4k.server.SunHttp
-import org.http4k.server.asServer
 
 
-fun createContractHandler(summary : String,path : String,method: Method,handler : HttpHandler,): ContractRoute {
-    val greetingLens = Body.string(ContentType.TEXT_PLAIN).toLens()
+
+fun createContractHandler(summary : String,path : String,method: Method,handler : HttpHandler,contentType : ContentType): ContractRoute {
+    val biDiBodyLens = Body.string(contentType).toLens()
 
 
     // Define a single http route for our contract
     val contractRoute = path meta {
         operationId = path.replace("/","")
         this.summary = summary
-        returning(Status.OK, greetingLens to "Sample Greeting")
+        returning(HttpStatus.OK, biDiBodyLens to "Sample Greeting")
     } bindContract method to handler
 
     return  contractRoute
@@ -33,8 +29,8 @@ fun createContractHandler(summary : String,path : String,method: Method,handler 
 
 
 
-fun  createAll( employementContracts : List<ContractRoute>) =  contract {
-    routes += employementContracts
+fun  createAll(employmentContracts : List<ContractRoute>) =  contract {
+    routes += employmentContracts
     renderer = OpenApi3(
         ApiInfo("QuickAPI", "0.1.0")
     )

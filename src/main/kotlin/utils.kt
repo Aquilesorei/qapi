@@ -3,14 +3,12 @@ package org.aquiles
 import com.andreapivetta.kolor.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.http4k.core.MultipartFormBody
-import org.http4k.core.Request
-import org.http4k.core.Response
+import org.aquiles.core.ContentType
+import org.aquiles.core.jsonResponse
+import org.aquiles.serialization.fromJson
+import org.http4k.core.*
 import org.http4k.routing.path
-import kotlin.reflect.KClass
-import kotlin.reflect.KParameter
-import kotlin.reflect.KType
-import kotlin.reflect.javaType
+import kotlin.reflect.*
 
 @OptIn(ExperimentalStdlibApi::class)
 fun castBasedOnType(value: Any, kType: KType): Any? {
@@ -63,26 +61,6 @@ fun formatRoutePrefix(prefix: String?): String {
     } ?: "" // Return empty string for null prefix
 }
 
-
-/**
- *
- * Deserializes a json to the corresponding type
- */
-
-@OptIn(ExperimentalStdlibApi::class)
-fun fromJson(jsonMap: Map<String, Any>, kType: KType): Any? {
-    try {
-        val gson = Gson()
-        val json = gson.toJson(jsonMap) // Convert map back to JSON string
-        return gson.fromJson(json, kType.javaType)
-    } catch (e: Exception) {
-        e.printStackTrace()
-        return null
-    }
-}
-
-
-
 /**
  * Processes parameters from a request and maps them to function parameters
  */
@@ -130,6 +108,8 @@ private fun handleMultipartForm(request: Request, fields: Array<String>, files: 
     val multipartForm = MultipartFormBody.from(request)
     val list = mutableListOf<UploadFile>()
 
+
+
     files.forEach { field ->
         multipartForm.file(field)?.let { fileInput ->
             val up = UploadFile(fileInput.filename, fileInput.contentType, fileInput.content)
@@ -168,12 +148,17 @@ fun convertToSentenceCase(input: String): String {
     return capitalizedWords.joinToString(" ")
 }
 
-/*
-// Test cases
-val examples = listOf("addHandler", "AddHandler", "add_handler", "getUsers", "get-users", "", "  ", "multiple--separators")
 
-examples.forEach { input ->
-    val result = convertToSentenceCase(input)
-    println("$input -> $result")
-}
-*/
+
+/*
+fun  getContenType(function: KCallable<*>): ContentType? {
+    val type = function.returnType;
+    return when(type.classifier) {
+        null -> null
+         Response::class -> null
+        String::class  -> ContentType.TEXT_PLAIN
+         Number::class, Boolean::class,  Enum::class, Pair::class , Collection::class,Map::class-> ContentType.APPLICATION_JSON
+        else -> handleCustomResponse(res)
+    }
+    }
+}*/

@@ -11,9 +11,6 @@ typealias HttpResponse = Response
 
 
 
-
-
-
 /**
  * Sets the body of the response to a JSON representation of the data object,
  * using the provided Gson instance for serialization.
@@ -29,3 +26,7 @@ fun <T> HttpResponse.jsonResponse(data: T, gson: Gson = Gson()): HttpResponse {
             .body("Error serializing response to JSON")
     }
 }
+/*
+fun JsonResponse(data: Any,status : HttpStatus): HttpResponse {
+
+}*/
