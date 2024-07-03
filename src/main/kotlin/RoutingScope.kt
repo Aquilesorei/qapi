@@ -1,5 +1,7 @@
 package org.aquiles
 
+import org.aquiles.core.HttpMiddleware
+
 abstract  class RoutingScope() {
 
     private val scopeMiddleware = mutableListOf<HttpMiddleware>()

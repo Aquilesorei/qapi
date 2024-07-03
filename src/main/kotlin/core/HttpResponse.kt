@@ -39,7 +39,7 @@ class HttpResponse private  constructor(var statusCode: HttpStatus, override var
         this.body = Body(body)
 
     }
-    fun setBody(body : Body) {
+    fun body(body : Body) {
         this.body = body
     }
 

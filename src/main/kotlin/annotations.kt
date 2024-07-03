@@ -1,11 +1,11 @@
 package org.aquiles
 
-import org.aquiles.core.Method
+import org.aquiles.core.HttpMethod
 
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class EndPoint(val method: Method, val path: String,val contentType: String = "application/json")
+annotation class EndPoint(val method: HttpMethod, val path: String,val contentType: String = "application/json")
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

@@ -4,10 +4,15 @@ package org.aquiles
 
 import Server.HttpServer
 import core.RouteData
+import io.undertow.Handlers
 import io.undertow.Handlers.resource
+import io.undertow.server.HttpServerExchange
+import io.undertow.server.RoutingHandler
 import io.undertow.server.handlers.resource.PathResourceManager
 import io.undertow.server.handlers.resource.ResourceHandler
 import io.undertow.util.BadRequestException
+import io.undertow.util.HttpString
+import io.undertow.util.SameThreadExecutor
 
 
 import org.http4k.server.asServer
@@ -29,6 +34,8 @@ import org.http4k.contract.ui.swaggerUiLite
 import org.http4k.routing.RoutingHttpHandler
 import org.http4k.server.Http4kServer
 import java.io.FileNotFoundException
+import java.nio.ByteBuffer
+import java.nio.channels.Channels
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.regex.Pattern
@@ -38,8 +45,8 @@ class Router() {
     private lateinit var server : HttpServer
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
      private val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
-
-     var  resourceHandler : ResourceHandler? = null
+    private val routingHandler: RoutingHandler = Handlers.routing()
+     private var  resourceHandler : ResourceHandler? = null
     private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
     init {
 
@@ -213,7 +220,7 @@ class Router() {
         return this;
     }
 
-    fun routesToRouteDataList(routes: List<Route>): List<RouteData> {
+/*    fun routesToRouteDataList(routes: List<Route>): List<RouteData> {
         val routeDataList = mutableListOf<RouteData>()
 
         fun collectRouteData(routes: List<Route>, parentPath: String = "") {
@@ -226,32 +233,23 @@ class Router() {
 
         collectRouteData(routes)
         return routeDataList
-    }
+    }*/
 
 
     fun withRoutes( vararg routes: Route, prefix : String? = null): Router  =  withRoutes(routes.asList(),prefix)
 
 
-    fun withRoutes( routes: List<Route>, prefix : String? = null): Router {
+    fun withRoutes(routes: List<Route>, prefix: String? = null): Router {
+        val formattedPrefix = prefix?.let { formatRoutePrefix(it) } ?: "" // Calculate prefix only once
 
+        allRoutes.addAll(
+            routes.flatMap { it.toHandler() }
+                .map { it.copy(path = formattedPrefix + it.path) } // Combine flatMap & map
+        )
 
-
-        var res = routesToRouteDataList(routes)
-
-
-        prefix?.let { pre ->
-            val formatedPrefix = formatRoutePrefix(prefix)
-          res= res.map {rd ->
-               rd.setPath("${formatedPrefix}${rd.path}")
-              rd
-           }
-
-        }
-
-        allRoutes.addAll(res)
-
-        return this;
+        return this
     }
+
 
 
     private fun createFunctionHandler(
@@ -314,6 +312,7 @@ class Router() {
      */
     fun start(port : Int) {
 
+
           for(md in  globalMiddleware){
 
               for (rt in allRoutes){
@@ -326,13 +325,60 @@ class Router() {
               }
           }
 
-        HttpServer(4000, routes = allRoutes, resourceHandler = resourceHandler).start()
+
+        allRoutes.forEach { routeData ->
+                routingHandler.add(
+                    HttpString(routeData.method),
+                    routeData.path
+                ) { exchange ->
+
+
+                    exchange.dispatch(SameThreadExecutor.INSTANCE, Runnable {
+                        coroutine.launch {
+                            sendHttpResponse(exchange,routeData.handler(HttpRequest.from(exchange)) )
+                        }
+                    })
+
+                }
+        }
+
+       server = HttpServer(port, routes = allRoutes, resourceHandler = resourceHandler, routingHandler = routingHandler)
+        server.start()
         println("Server started at http://localhost:${server.port()}/")
         println("Press Enter to stop the server.")
         readlnOrNull()
 
         // Stop the server
         stop()
+    }
+
+
+
+
+    private fun sendHttpResponse(exchange: HttpServerExchange, response: HttpResponse) {
+        exchange.statusCode = response.statusCode.code
+        response.headers.forEach { (name, value) ->
+            exchange.responseHeaders.put(HttpString(name), value.toString())
+        }
+
+        // Stream the response body directly to the exchange output stream
+        val inputStream = response.body.stream
+        val sinkChannel = exchange.responseChannel
+        val buffer = ByteBuffer.allocate(8192)  // Buffer size
+
+        inputStream.use {
+            var bytesRead: Int
+            val channel = Channels.newChannel(inputStream)
+            while (channel.read(buffer).also { bytesRead = it } != -1) {
+                buffer.flip()
+                while (buffer.hasRemaining()) {
+                    sinkChannel.write(buffer)
+                }
+                buffer.clear()
+            }
+        }
+
+        exchange.endExchange()
     }
 
     /**

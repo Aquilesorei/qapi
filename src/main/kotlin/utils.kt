@@ -12,6 +12,9 @@ import org.http4k.core.Request
 import org.http4k.core.Response
 import org.http4k.routing.path
 import kotlin.reflect.*
+fun normalizePath(path: String): String {
+    return path.replace(Regex("/{2,}"), "/")
+}
 
 @OptIn(ExperimentalStdlibApi::class)
 fun castBasedOnType(value: Any, kType: KType): Any? {
@@ -70,6 +73,12 @@ fun formatRoutePrefix(prefix: String?): String {
  fun processParams(parameters: List<KParameter>, req: HttpRequest, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
     val map = mutableMapOf<KParameter, Any>()
 
+
+
+    println(req.pathParameters)
+    if (req.queryParameters.isEmpty() && req.pathParameters.isEmpty()){
+        return map
+    }
     parameters.forEach { param ->
         param.name?.let { name ->
             val res = req.query(name) ?: req.path(name)

@@ -16,13 +16,14 @@ class Route(
 
 
     fun toHandler(): List<RouteData> {
-        val initialRouteData = RouteData(method.name, path, handler)
+        val initialRouteData = RouteData(method.name, normalizePath(path), handler)
         val allRoutes = mutableListOf(initialRouteData)
 
         // Recursively collect all child routes
         fun collectRoutes(route: Route, parentPath: String) {
             for (child in route.childRoutes) {
-                val fullPath = parentPath + child.path
+                val fullPath =
+                   normalizePath(parentPath + child.path)
                 allRoutes.add(RouteData(child.method.name, fullPath, child.handler))
                 collectRoutes(child, fullPath)
             }

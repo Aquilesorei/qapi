@@ -4,11 +4,11 @@ import core.RouteData
 import io.undertow.Undertow
 import io.undertow.UndertowOptions.ENABLE_HTTP2
 import io.undertow.server.HttpServerExchange
+import io.undertow.server.RoutingHandler
 import io.undertow.server.handlers.form.FormDataParser
 import io.undertow.server.handlers.resource.ResourceHandler
 import io.undertow.util.HttpString
 import io.undertow.util.SameThreadExecutor
-import jdk.internal.joptsimple.internal.Strings
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -21,7 +21,8 @@ import java.io.IOException
 
 
 class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val routes: MutableList<RouteData>,
-                 private val resourceHandler: ResourceHandler?) {
+                 private val resourceHandler: ResourceHandler?, val  routingHandler: RoutingHandler
+) {
     private lateinit var server: Undertow
 
 
@@ -29,9 +30,34 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
 
 
     fun start() {
-         val rootHandler = CoroutinesHandlerAdapter(routes);
+
+     /*   val router = io.undertow.Handlers.routing()
+
+        // Route with a path parameter
+        router.get("/users/{userId}") { exchange ->
+            val userId = exchange.pathParameters["userId"]?.firstOrNull()
+
+            if (userId != null) {
+                // Fetch user data based on userId (e.g., from a database)
+                val userData = getUserData(userId)
+
+                if (userData != null) {
+                    exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
+                    exchange.statusCode = StatusCodes.OK
+                    exchange.responseSender.send(userData.toString()) // Assuming userData can be serialized to JSON
+                } else {
+                    exchange.statusCode = StatusCodes.NOT_FOUND
+                    exchange.responseSender.send("User not found")
+                }
+            } else {
+                exchange.statusCode = StatusCodes.BAD_REQUEST
+                exchange.responseSender.send("Invalid user ID")
+            }
+        }*/
+
+        //val rootHandler = CoroutinesHandlerAdapter(routes);
         server = Undertow.builder()
-            .addHttpListener(port, host,rootHandler)
+            .addHttpListener(port, host,routingHandler)
             .setServerOption(ENABLE_HTTP2, false)
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
             .setHandler(resourceHandler)
@@ -58,49 +84,5 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
 
 
 
-class CoroutinesHandlerAdapter(private val routes: MutableList<RouteData>) :  io.undertow.server.HttpHandler {
-
-   // private val handler: CoroutinesHandler
-    @OptIn(DelicateCoroutinesApi::class)
-    override fun handleRequest(exchange: HttpServerExchange) {
-        exchange.dispatch(SameThreadExecutor.INSTANCE, Runnable {
-            GlobalScope.launch(Dispatchers.Default) {
-                val request = HttpRequest.from(exchange)
-                val response = handleRequest(request)
-                sendHttpResponse(exchange, response)
-            }
-        })
-    }
-
-
-
-    private fun sendHttpResponse(exchange: HttpServerExchange, response: HttpResponse) {
-        println(exchange.requestPath)
-        exchange.statusCode = response.statusCode.code
-        response.headers.forEach { (name, value) ->
-            exchange.responseHeaders.put(HttpString(name), value.toString())
-        }
-
-
-        exchange.outputStream.write(response.body.stream.readAllBytes())
-    }
-
-    private fun handleRequest(request: HttpRequest): HttpResponse {
-        val  handler = findHandler(request)
-        val response = handler(request)
-        return response
-    }
-
-    private fun findHandler(request: HttpRequest): HttpHandler {
-        for (route in routes) {
-            if (route.matches(request)) {
-                return route.handler
-            }
-        }
-         throw Exception("route not found")
-    }
-
-
-}
 
 

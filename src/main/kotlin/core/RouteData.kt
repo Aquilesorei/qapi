@@ -6,15 +6,12 @@ import java.util.regex.Pattern
 
 data class RouteData(val method: String, var path : String, var handler: HttpHandler){
 
-    private var pathPattern: Pattern
+    var pathPattern: Pattern
     init {
         pathPattern = Pattern.compile(pathToRegex(path))
     }
 
-    fun  setPath(path: String) {
-        this.path = path
-        pathPattern = Pattern.compile(pathToRegex(path))
-    }
+
 
     private fun pathToRegex(path: String): String {
         return path.replace("{", "(?<").replace("}", ">[^/]+)") + "$"
