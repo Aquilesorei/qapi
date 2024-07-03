@@ -361,15 +361,13 @@ class Router() {
             exchange.responseHeaders.put(HttpString(name), value.toString())
         }
 
-        // Stream the response body directly to the exchange output stream
         val inputStream = response.body.stream
         val sinkChannel = exchange.responseChannel
         val buffer = ByteBuffer.allocate(8192)  // Buffer size
 
         inputStream.use {
-            var bytesRead: Int
             val channel = Channels.newChannel(inputStream)
-            while (channel.read(buffer).also { bytesRead = it } != -1) {
+            while (channel.read(buffer) != -1) {
                 buffer.flip()
                 while (buffer.hasRemaining()) {
                     sinkChannel.write(buffer)
@@ -380,7 +378,6 @@ class Router() {
 
         exchange.endExchange()
     }
-
     /**
      * Stops the HTTP server
      */
