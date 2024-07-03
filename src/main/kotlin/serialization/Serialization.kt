@@ -2,17 +2,17 @@ package org.aquiles.serialization
 
 import com.google.gson.Gson
 import org.aquiles.core.HttpResponse
+
 import org.aquiles.core.jsonResponse
 
-import org.http4k.core.Response
 import kotlin.reflect.KType
 import kotlin.reflect.javaType
 
 
-fun handleResponse(res: Any?): Response {
+fun handleResponse(res: Any?): HttpResponse {
     return when (res) {
-        null -> HttpResponse.InternalServerError().body("Internal server error")
-        is Response -> res
+        null -> HttpResponse.InternalServerError()
+        is HttpResponse -> res
         is Number, is Boolean, is String, is Enum<*>,is Pair<*, *> -> HttpResponse.Ok().jsonResponse(res)
         is Collection<*> -> handleCollectionResponse(res)
         is Map<*, *> -> handleMapResponse(res)
@@ -20,7 +20,7 @@ fun handleResponse(res: Any?): Response {
     }
 }
 
-private fun handleCollectionResponse(res: Collection<*>): Response {
+private fun handleCollectionResponse(res: Collection<*>): HttpResponse {
     return if (res.isEmpty() || res.first() is Number || res.first() is String || res.first() is Boolean || res.first() is Enum<*>) {
         HttpResponse.Ok().jsonResponse(res)
     } else {
@@ -29,7 +29,7 @@ private fun handleCollectionResponse(res: Collection<*>): Response {
     }
 }
 
-private fun handleMapResponse(res: Map<*, *>): Response {
+private fun handleMapResponse(res: Map<*, *>):  HttpResponse {
     return if (res.isEmpty() || res.values.first() is Number || res.values.first() is String || res.values.first() is Boolean || res.values.first() is Enum<*>) {
         HttpResponse.Ok().jsonResponse(res)
     } else {
@@ -38,7 +38,7 @@ private fun handleMapResponse(res: Map<*, *>): Response {
     }
 }
 
-private fun handleCustomResponse(res: Any): Response {
+private fun handleCustomResponse(res: Any):  HttpResponse{
     val kClass = res::class
     return when {
         kClass.isData || kClass.isSealed || kClass.isAbstract || kClass.objectInstance != null -> {

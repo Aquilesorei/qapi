@@ -4,11 +4,12 @@ package org.aquiles
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 
 import kotlinx.coroutines.delay
+import Server.HttpServer
 import  org.aquiles.core.HttpStatus
 import org.aquiles.core.*
 
  val myFilter = HttpMiddleware { next: HttpHandler ->
-    { request: Request ->
+    { request ->
         val start = System.currentTimeMillis()
         val response = next(request)
         val latency = System.currentTimeMillis() - start
@@ -44,20 +45,20 @@ class MyScope : RoutingScope() {
     fun registerUser(user: User): HttpResponse {
         println("Registering user ${user.name}")
 
-       return HttpResponse.Ok().body("oulalalal\n")
+       return HttpResponse(HttpStatus.OK,"oulalalal\n")
     }
 
 
     @Get("/add/{a}/{b}")
-    fun add(a: Int, b: Int): HttpResponse {
+    fun add(a: Int, b: Int):HttpResponse{
         if(a == 5) {
             throw Exception("they not like us")
         }
-        return HttpResponse(HttpStatus.OK).body("$a + $b = ${a + b}")
+        return HttpResponse(HttpStatus.OK,"$a + $b = ${a + b}")
     }
 
     @Get("/hello/{lastname}/{name}")
-    fun hello(lastname: String, name: String): HttpResponse {
+    fun hello(lastname: String, name: String): HttpResponse{
         return HttpResponse(HttpStatus.OK)
     }
 
@@ -72,7 +73,7 @@ class MyScope : RoutingScope() {
         }
 
 
-        return HttpResponse(HttpStatus.OK).body("received $builder")
+        return HttpResponse(HttpStatus.OK,"received $builder")
     }
 
 
@@ -86,12 +87,12 @@ class MyScope : RoutingScope() {
 fun main() {
 
 
-
     val router = Router()
     router.addScope(MyScope(),prefix = "/api")
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
-        .start(Undertow(9000))
+        .start(9000)
 
-  //  testIt()
+
+
 }

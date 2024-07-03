@@ -1,29 +1,41 @@
 package org.aquiles
 
-import org.aquiles.core.jsonResponse
-import org.http4k.core.*
-import org.http4k.core.Method.*
-import org.http4k.core.Status.Companion.OK
-import org.http4k.routing.RoutingHttpHandler
-import org.http4k.routing.bind
-import org.http4k.routing.routes
-import kotlin.reflect.jvm.internal.impl.descriptors.Visibilities.Private
+import core.RouteData
+import org.aquiles.core.*
+import org.aquiles.core.HttpMethod.*
 
 class Route(
-    private val method: Method,
-    private val path: String,
-    private val handler:HttpHandler,
+    val method: HttpMethod,
+    val path: String,
+    val handler:HttpHandler,
     private val  middlewares : List<HttpMiddleware> = emptyList(),
-    private  val childRoutes : List<Route> = emptyList()
+    val childRoutes : List<Route> = emptyList()
 ){
-    fun toHandler(): RoutingHttpHandler {
-        val finalHandler = "/" bind method to handler
-        val handlers = listOf(finalHandler) + childRoutes.map { it.toHandler() }
 
-       return middlewares.fold(path bind routes(handlers)) { h, middleware ->
-            middleware.then(h)
+
+
+
+    fun toHandler(): List<RouteData> {
+        val initialRouteData = RouteData(method.name, path, handler)
+        val allRoutes = mutableListOf(initialRouteData)
+
+        // Recursively collect all child routes
+        fun collectRoutes(route: Route, parentPath: String) {
+            for (child in route.childRoutes) {
+                val fullPath = parentPath + child.path
+                allRoutes.add(RouteData(child.method.name, fullPath, child.handler))
+                collectRoutes(child, fullPath)
+            }
         }
 
+        collectRoutes(this, path)
+
+        // Apply middlewares to each collected route
+        return allRoutes.onEach { routeData ->
+            middlewares.forEach { middleware ->
+                routeData.handler = middleware.then(routeData.handler)
+            }
+        }
     }
 
 
@@ -46,7 +58,7 @@ class Route(
 
 
         fun withChild(
-            method: Method,
+            method: HttpMethod,
             path: String,
             handler: HttpHandler,
             middlewares: List<HttpMiddleware> = emptyList(),
@@ -76,6 +88,11 @@ val  myRoutes = listOf(
     Route(
         method = GET,
         path = "/",
+        middlewares = listOf(),
+        handler = {req : HttpRequest->
+
+            return@Route    HttpResponse(HttpStatus.OK,"Hello World!")
+        },
         childRoutes = listOf(
             Route(
                 method = GET,
@@ -86,17 +103,17 @@ val  myRoutes = listOf(
                         path = "/wtf2",
                         childRoutes = listOf(),
                         middlewares = listOf(),
-                        handler = {req : Request->
+                        handler = {req : HttpRequest->
 
 
-                            return@Route  Response(OK).body("Hello World subroute 2")
+                            return@Route  HttpResponse(HttpStatus.OK,"Hello World subroute 2")
                         }
                     ),
                 ),
                 middlewares = listOf(),
-                handler = {req : Request->
+                handler = {req :  HttpRequest->
 
-                    return@Route  Response(OK).body("Hello World subroute 1")
+                    return@Route   HttpResponse(HttpStatus.OK,"Hello World subroute 1")
                 }
             ),
 
@@ -107,28 +124,21 @@ val  myRoutes = listOf(
                 middlewares = listOf(
                     myFilter
                 ),
-                handler = {req : Request->
+                handler = {req : HttpRequest->
 
-                    return@Route  Response.Ok().jsonResponse(User("Achille",23))
+                    return@Route  HttpResponse.Ok().jsonResponse(User("Achille",23))
                 }
             ),
         ),
-        middlewares = listOf(
-
-        ),
-        handler = {req : Request->
-
-            return@Route  Response(OK).body("Hello World!")
-        }
     ),
     Route(
         method = GET,
         path = "/hello",
         childRoutes = listOf(),
         middlewares = listOf(),
-        handler = {req : Request->
+        handler = {req : HttpRequest->
 
-            return@Route  Response(OK).body("Hello World 2")
+            return@Route    HttpResponse(HttpStatus.OK,"Hello World 2")
         }
     ),
     Route(
@@ -136,9 +146,9 @@ val  myRoutes = listOf(
         path = "/calculate",
         childRoutes = listOf(),
         middlewares = listOf(),
-        handler = {req : Request->
+        handler = {req : HttpRequest->
 
-            return@Route  Response(OK).body("Hello World 3")
+            return@Route    HttpResponse(HttpStatus.OK,"Hello World 3")
         }
     ),
 )

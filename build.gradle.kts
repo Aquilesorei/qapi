@@ -14,29 +14,6 @@ dependencies {
     testImplementation(kotlin("test"))
   //  implementation(platform("org.http4k:http4k-bom:5.17.0.0"))
     implementation("org.http4k:http4k-core")
-    // Apache v5:
-    implementation("org.http4k:http4k-server-apache")
-
-    // Apache v4:
-    implementation("org.http4k:http4k-server-apache4")
-
-    // Jetty & JettyLoom:
-    implementation("org.http4k:http4k-server-jetty")
-
-    // Helidon (Loom):
-    implementation("org.http4k:http4k-server-helidon")
-
-    // Ktor CIO:
-    implementation("org.http4k:http4k-server-ktorcio")
-
-    // Ktor Netty:
-    implementation("org.http4k:http4k-server-ktornetty")
-
-    // Netty:
-    implementation("org.http4k:http4k-server-netty")
-
-    // Ratpack:
-    implementation("org.http4k:http4k-server-ratpack")
 
     // Undertow:
     implementation("org.http4k:http4k-server-undertow")
@@ -54,6 +31,10 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.6.0")
+
+    // https://mvnrepository.com/artifact/io.undertow/undertow-core
+    implementation("io.undertow:undertow-core:2.3.14.Final")
+
 }
 
 tasks.test {

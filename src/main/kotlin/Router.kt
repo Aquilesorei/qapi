@@ -2,13 +2,16 @@ package org.aquiles
 
 
 
-import io.ktor.http.*
+import Server.HttpServer
+import core.RouteData
+import io.undertow.Handlers.resource
+import io.undertow.server.handlers.resource.PathResourceManager
+import io.undertow.server.handlers.resource.ResourceHandler
 import io.undertow.util.BadRequestException
 
 
 import org.http4k.server.asServer
 
-import org.http4k.core.*
 import org.http4k.routing.*
 import org.http4k.server.ServerConfig
 //kotlin reflect
@@ -18,57 +21,59 @@ import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.full.findAnnotation
 
 import kotlinx.coroutines.*
-import org.aquiles.core.ContentType
-import org.aquiles.core.HttpResponse
-import org.aquiles.core.HttpStatus
-import org.aquiles.core.jsonResponse
+import org.aquiles.core.*
 import org.aquiles.serialization.handleResponse
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.ui.redocLite
 import org.http4k.contract.ui.swaggerUiLite
+import org.http4k.routing.RoutingHttpHandler
 import org.http4k.server.Http4kServer
+import java.io.FileNotFoundException
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.util.regex.Pattern
 
 class Router() {
-
-    private lateinit var server : Http4kServer
-    private var app: RoutingHttpHandler
+    val allRoutes = mutableListOf<RouteData>()
+    private lateinit var server : HttpServer
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
      private val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
 
+     var  resourceHandler : ResourceHandler? = null
     private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
     init {
-        app = routes(emptyList<Route>().map {
-            it.toHandler()
-        }.toList())
+
 
 
 
         globalMiddleware.add(
-            HttpMiddleware {
-                    next: HttpHandler -> {
-                    request: Request ->
-                val response = next(request)
-                logRequest(request,response)
-                response
-            }
+            HttpMiddleware{ next ->
+                 {request : HttpRequest ->
+                    val response = next(request)
+                   // logRequest(request,response)
+                    response
+                }
             }
         )
     }
 
-    /**
-     * Returns the app as a RoutingHttpHandler
-     */
-    fun asHttpHandler(): RoutingHttpHandler {
-        return app
-    }
+
+
+
+
+
+
 
     /**
      * Applies middleware to a handler based on endpoint-specific middleware
      */
     private fun applyMiddleware(handler: HttpHandler, endpoint: String, middlewareMap: Map<String, List<HttpMiddleware>>): HttpHandler {
-        return middlewareMap[endpoint]?.fold(handler) { h, middleware ->
-            middleware.then(h)
-        } ?: handler
+        
+        var h = handler;
+        middlewareMap[endpoint]?.forEach {  middleware ->
+            h = middleware.then(h)
+        }
+        return  handler;
     }
 
     /**
@@ -96,7 +101,7 @@ class Router() {
     /**
      * Adds a handler for a given method, path, and scope
      */
-    private fun addHandler(function: KCallable<*>,method: Method, path: String, scope: RoutingScope, prefix : String?,multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()) {
+    private fun addHandler(function: KCallable<*>,method: HttpMethod, path: String, scope: RoutingScope, prefix : String?,multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()) {
 
 
         val handler: HttpHandler = createFunctionHandler(scope,function,multipartFiles=multipartFiles, multipartFields = multipartFields)
@@ -106,8 +111,9 @@ class Router() {
         h = applyMiddleware(h, prefixedPath, scope.middleware())
 
 
-
-
+       val  routeData = RouteData(method.name,prefixedPath,h)
+        allRoutes.add(routeData)
+/*
         val contractRoute = createContractHandler(
             summary = convertToSentenceCase(function.name),
             path  = prefixedPath,
@@ -115,7 +121,7 @@ class Router() {
             method = method,
             contentType = ContentType.TEXT_PLAIN
         )
-        employementContracts.add(contractRoute)
+        employementContracts.add(contractRoute)*/
     }
 
 
@@ -144,7 +150,7 @@ class Router() {
                             val path = anon.path
                             //println("Found GET endpoint: $path on ${function.name}")
 
-                            addHandler(function, Method.GET, anon.path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.GET, anon.path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Post>() != null -> {
                             val anon = function.findAnnotation<Post>()!!
@@ -152,48 +158,48 @@ class Router() {
                             val multipartFiles = anon.multipartFiles
                             val multipartFields = anon.multipartFields
                             //  println("Found POST endpoint: $path on ${function.name}")
-                            addHandler(function, Method.POST, path, scope = scope,prefix=prefix,multipartFields=multipartFields,multipartFiles=multipartFiles)
+                            addHandler(function, HttpMethod.POST, path, scope = scope,prefix=prefix,multipartFields=multipartFields,multipartFiles=multipartFiles)
                         }
                         function.findAnnotation<Put>() != null -> {
                             val path = function.findAnnotation<Put>()!!.path
                             // println("Found PUT endpoint: $path on ${function.name}")
-                            addHandler(function, Method.PUT, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.PUT, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Delete>() != null -> {
                             val path = function.findAnnotation<Delete>()!!.path
                             // println("Found DELETE endpoint: $path on ${function.name}")
 
-                            addHandler(function, Method.DELETE, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.DELETE, path, scope = scope,prefix=prefix)
 
                         }
                         function.findAnnotation<Patch>() != null -> {
                             val path = function.findAnnotation<Patch>()!!.path
                             //println("Found PATCH endpoint: $path on ${function.name}")
-                            addHandler(function, Method.PATCH, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.PATCH, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Head>() != null -> {
                             val path = function.findAnnotation<Head>()!!.path
                             //println("Found HEAD endpoint: $path on ${function.name}")
 
-                            addHandler(function, Method.HEAD, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.HEAD, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Options>() != null -> {
                             val path = function.findAnnotation<Options>()!!.path
                             //println("Found OPTIONS endpoint: $path on ${function.name}")
 
-                            addHandler(function, Method.OPTIONS, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.OPTIONS, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Trace>() != null -> {
                             val path = function.findAnnotation<Trace>()!!.path
                             //println("Found TRACE endpoint: $path on ${function.name}")
 
-                            addHandler(function, Method.TRACE, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.TRACE, path, scope = scope,prefix=prefix)
                         }
                         function.findAnnotation<Purge>() != null -> {
                             val path = function.findAnnotation<Purge>()!!.path
                             // println("Found PURGE endpoint: $path on ${function.name}")
 
-                            addHandler(function, Method.PURGE, path, scope = scope,prefix=prefix)
+                            addHandler(function, HttpMethod.PURGE, path, scope = scope,prefix=prefix)
                         }
                     }
                 }
@@ -207,6 +213,20 @@ class Router() {
         return this;
     }
 
+    fun routesToRouteDataList(routes: List<Route>): List<RouteData> {
+        val routeDataList = mutableListOf<RouteData>()
+
+        fun collectRouteData(routes: List<Route>, parentPath: String = "") {
+            for (route in routes) {
+                val fullPath = parentPath + route.path
+                routeDataList.add(RouteData(route.method.name, fullPath, route.handler))
+                collectRouteData(route.childRoutes, fullPath) // Recursively collect child route data
+            }
+        }
+
+        collectRouteData(routes)
+        return routeDataList
+    }
 
 
     fun withRoutes( vararg routes: Route, prefix : String? = null): Router  =  withRoutes(routes.asList(),prefix)
@@ -215,14 +235,21 @@ class Router() {
     fun withRoutes( routes: List<Route>, prefix : String? = null): Router {
 
 
-        var combinedHandler: RoutingHttpHandler = routes(routes.map {
-            it.toHandler()
-        }.toList())
 
-        prefix?.let {
-            combinedHandler = combinedHandler.withBasePath(it)
+        var res = routesToRouteDataList(routes)
+
+
+        prefix?.let { pre ->
+            val formatedPrefix = formatRoutePrefix(prefix)
+          res= res.map {rd ->
+               rd.setPath("${formatedPrefix}${rd.path}")
+              rd
+           }
+
         }
-        app = routes(app, combinedHandler)
+
+        allRoutes.addAll(res)
+
         return this;
     }
 
@@ -233,8 +260,8 @@ class Router() {
         multipartFields: Array<String> = arrayOf(),
         multipartFiles: Array<String> = arrayOf(),
     ): HttpHandler {
-        return { req: Request ->
-            val responseCompletable = CompletableDeferred<Response>()
+        return { req: HttpRequest ->
+            val responseCompletable = CompletableDeferred<HttpResponse>()
 
             coroutine.launch(Dispatchers.IO) {
                 try {
@@ -244,10 +271,10 @@ class Router() {
                     responseCompletable.complete(handleResponse(res))
                 } catch (e: BadRequestException) {
                     e.printStackTrace()
-                    responseCompletable.complete(Response(Status.BAD_REQUEST).body(e.message ?: "Bad Request"))
+                    responseCompletable.complete(HttpResponse(HttpStatus.BAD_REQUEST,"Bad Request"))
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    responseCompletable.complete(Response(Status.INTERNAL_SERVER_ERROR).body("Internal server error"))
+                    responseCompletable.complete(HttpResponse(HttpStatus.INTERNAL_SERVER_ERROR,"Internal server error"))
                 }
             }
 
@@ -258,11 +285,23 @@ class Router() {
     }
 
 
+    /**
+     * serve all file for the directory [directory]
+     * path is the http path
+     */
     fun staticFiles(path  : String,directory : String): Router {
-        val staticFileHandler = static(
-            resourceLoader = ResourceLoader.Directory(directory), // Assuming "static" folder in project root
-        )
-        app = routes(app, path bind Method.GET to staticFileHandler)
+
+
+        val  directoryPath = Paths.get(directory)
+        if (Files.exists(directoryPath) && Files.isDirectory(directoryPath)) {
+            resourceHandler =  resource(PathResourceManager(directoryPath, 100)).setDirectoryListingEnabled(true)
+
+        } else {
+         throw  FileNotFoundException("Directory does not exist")
+        }
+
+
+
         return this;
     }
 
@@ -273,33 +312,21 @@ class Router() {
     /**
      * Starts the HTTP server on the given port
      */
-    fun start( config: ServerConfig) {
+    fun start(port : Int) {
 
-          for(f in  globalMiddleware){
-              app = app.withFilter(f);
+          for(md in  globalMiddleware){
+
+              for (rt in allRoutes){
+
+
+                  rt.apply {
+                      handler = md.then(handler)
+                  }
+
+              }
           }
 
-        app =  routes(
-            app,
-            // bind the API and OpenApi description off of root
-            createAll(employementContracts),
-
-            // bind Swagger UI to the root path
-            swaggerUiLite {
-                url = "/openapi.json"
-                pageTitle = "QuickAPI - Swagger UI"
-                persistAuthorization = true
-            },
-
-            // Bind Redoc to another path
-            "/redoc" bind redocLite {
-                url = "/openapi.json"
-                pageTitle = "QuickAPI - Redoc"
-                options["disable-search"] = "true"
-            }
-        )
-        server = app.asServer(config)
-        server.start()
+        HttpServer(4000, routes = allRoutes, resourceHandler = resourceHandler).start()
         println("Server started at http://localhost:${server.port()}/")
         println("Press Enter to stop the server.")
         readlnOrNull()

@@ -11,6 +11,7 @@ import org.http4k.lens.string
 
 
 
+/*
 
 fun createContractHandler(summary : String,path : String,method: Method,handler : HttpHandler,contentType : ContentType): ContractRoute {
     val biDiBodyLens = Body.string(contentType).toLens()
@@ -37,3 +38,4 @@ fun  createAll(employmentContracts : List<ContractRoute>) =  contract {
     this.descriptionPath = "/openapi.json"
 }
 
+*/

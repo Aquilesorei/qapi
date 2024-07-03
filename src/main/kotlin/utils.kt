@@ -4,9 +4,12 @@ import com.andreapivetta.kolor.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.aquiles.core.ContentType
+import org.aquiles.core.HttpRequest
 import org.aquiles.core.jsonResponse
 import org.aquiles.serialization.fromJson
-import org.http4k.core.*
+import org.http4k.core.MultipartFormBody
+import org.http4k.core.Request
+import org.http4k.core.Response
 import org.http4k.routing.path
 import kotlin.reflect.*
 
@@ -64,7 +67,7 @@ fun formatRoutePrefix(prefix: String?): String {
 /**
  * Processes parameters from a request and maps them to function parameters
  */
- fun processParams(parameters: List<KParameter>, req: Request, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
+ fun processParams(parameters: List<KParameter>, req: HttpRequest, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
     val map = mutableMapOf<KParameter, Any>()
 
     parameters.forEach { param ->
@@ -74,7 +77,7 @@ fun formatRoutePrefix(prefix: String?): String {
                 castBasedOnType(res, param.type)?.let {
                     map[param] = it
                 }
-            } else if (req.header("Content-Type") == "application/json") {
+            } else if (req.getHeader("Content-Type") == "application/json") {
 
 
 
@@ -104,9 +107,10 @@ fun formatRoutePrefix(prefix: String?): String {
 /**
  * Handles multipart form data from a request
  */
-private fun handleMultipartForm(request: Request, fields: Array<String>, files: Array<String>): List<UploadFile> {
-    val multipartForm = MultipartFormBody.from(request)
+private fun handleMultipartForm(request: HttpRequest, fields: Array<String>, files: Array<String>): List<UploadFile> {
     val list = mutableListOf<UploadFile>()
+/*    val multipartForm = MultipartFormBody.from(request)
+
 
 
 
@@ -115,7 +119,7 @@ private fun handleMultipartForm(request: Request, fields: Array<String>, files: 
             val up = UploadFile(fileInput.filename, fileInput.contentType, fileInput.content)
             list.add(up)
         }
-    }
+    }*/
 
     return list
 }
@@ -149,6 +153,9 @@ fun convertToSentenceCase(input: String): String {
 }
 
 
+fun List<Pair<String, String>>.toMutableMap(): MutableMap<String, String> {
+    return this.associateTo(mutableMapOf()) { it }
+}
 
 /*
 fun  getContenType(function: KCallable<*>): ContentType? {
