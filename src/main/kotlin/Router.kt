@@ -2,6 +2,8 @@ package org.aquiles
 
 
 
+//kotlin reflect
+
 import Server.HttpServer
 import core.RouteData
 import io.undertow.Handlers
@@ -13,35 +15,22 @@ import io.undertow.server.handlers.resource.ResourceHandler
 import io.undertow.util.BadRequestException
 import io.undertow.util.HttpString
 import io.undertow.util.SameThreadExecutor
-
-
-import org.http4k.server.asServer
-
-import org.http4k.routing.*
-import org.http4k.server.ServerConfig
-//kotlin reflect
-import kotlin.reflect.*
-import kotlin.reflect.full.callSuspendBy
-import kotlin.reflect.full.instanceParameter
-import kotlin.reflect.full.findAnnotation
-
 import kotlinx.coroutines.*
 import org.aquiles.core.*
 import org.aquiles.serialization.handleResponse
 import org.http4k.contract.ContractRoute
-import org.http4k.contract.ui.redocLite
-import org.http4k.contract.ui.swaggerUiLite
-import org.http4k.routing.RoutingHttpHandler
-import org.http4k.server.Http4kServer
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.util.regex.Pattern
+import kotlin.reflect.KCallable
+import kotlin.reflect.full.callSuspendBy
+import kotlin.reflect.full.findAnnotation
+import kotlin.reflect.full.instanceParameter
 
 class Router() {
-    val allRoutes = mutableListOf<RouteData>()
+    private val allRoutes = mutableListOf<RouteData>()
     private lateinit var server : HttpServer
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
      private val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
@@ -57,7 +46,7 @@ class Router() {
             HttpMiddleware{ next ->
                  {request : HttpRequest ->
                     val response = next(request)
-                   // logRequest(request,response)
+                    logRequest(request,response)
                     response
                 }
             }
@@ -118,8 +107,8 @@ class Router() {
         h = applyMiddleware(h, prefixedPath, scope.middleware())
 
 
-       val  routeData = RouteData(method.name,prefixedPath,h)
-        allRoutes.add(routeData)
+
+        allRoutes.add(RouteData(method.name,prefixedPath,h))
 /*
         val contractRoute = createContractHandler(
             summary = convertToSentenceCase(function.name),
@@ -144,7 +133,8 @@ class Router() {
         this.globalMiddleware.addAll(globalMiddleware)
 
 
-       val  job = coroutine.launch {val kClass = scope::class
+       val  job = coroutine.launch {
+           val kClass = scope::class
             for (function in kClass.members) {
                 val endpointAnnotation = function.findAnnotation<EndPoint>()
                 if (endpointAnnotation != null) {

@@ -47,10 +47,6 @@ class HttpResponse private  constructor(var statusCode: HttpStatus, override var
 
 
 
-    fun setStatus(code: HttpStatus) {
-        statusCode = code
-    }
-
 
     override fun addHeader(name: String, value: String) {
         headers[name] = HeaderValue(value)

@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.aquiles.core.ContentType
 import org.aquiles.core.HttpRequest
+import org.aquiles.core.HttpResponse
 import org.aquiles.core.jsonResponse
 import org.aquiles.serialization.fromJson
 import org.http4k.core.MultipartFormBody
@@ -75,7 +76,6 @@ fun formatRoutePrefix(prefix: String?): String {
 
 
 
-    println(req.pathParameters)
     if (req.queryParameters.isEmpty() && req.pathParameters.isEmpty()){
         return map
     }
@@ -132,15 +132,17 @@ private fun handleMultipartForm(request: HttpRequest, fields: Array<String>, fil
 
     return list
 }
-fun logRequest(request: Request, response : Response) {
+
+
+fun logRequest(request: HttpRequest, response : HttpResponse) {
 
     print("INFO:  ".green())
     print(request.uri.userInfo)
     print(" \"${request.method.name} ${request.uri.path} ${request.version}\" ")
-    if(response.status.code >=400){
-        println("${response.status.code} ${response.status.description}".red())
+    if(response.statusCode.code >=400){
+        println("${response.statusCode.code} ${response.statusCode.description}".red())
     }else{
-        println("${response.status.code} ${response.status.description}".green())
+        println("${response.statusCode.code} ${response.statusCode.description}".green())
     }
 
 
