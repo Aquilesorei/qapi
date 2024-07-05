@@ -16,6 +16,9 @@ import io.undertow.util.BadRequestException
 import io.undertow.util.HttpString
 import io.undertow.util.SameThreadExecutor
 import kotlinx.coroutines.*
+import openapi.Info
+import openapi.OpenAPIGenerator
+import openapi.OpenAPISpec
 import org.aquiles.core.*
 import org.aquiles.serialization.handleResponse
 import org.http4k.contract.ContractRoute
@@ -28,7 +31,7 @@ import kotlin.reflect.KCallable
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.instanceParameter
-
+import com.google.gson.Gson
 class Router() {
     private val allRoutes = mutableListOf<RouteData>()
     private lateinit var server : HttpServer
@@ -57,7 +60,19 @@ class Router() {
 
 
 
+    private fun generateOpenAPISpec(): OpenAPISpec {
+        val info = Info(
+            version = "1.0.0",
+            title = "API Specification Example"
+        )
+        val generator = OpenAPIGenerator(allRoutes)
+        return generator.generateOpenAPISpec(info)
+    }
 
+    fun printOpenAPISpec() {
+        val spec = generateOpenAPISpec()
+        println(Gson().toJson(spec))  // Use your preferred way to serialize and output the spec
+    }
 
 
     /**
@@ -302,8 +317,7 @@ class Router() {
      */
     fun start(port : Int) {
 
-
-          for(md in  globalMiddleware){
+        for(md in  globalMiddleware){
 
               for (rt in allRoutes){
 
@@ -314,7 +328,6 @@ class Router() {
 
               }
           }
-
 
         allRoutes.forEach { routeData ->
                 routingHandler.add(
@@ -371,7 +384,7 @@ class Router() {
     /**
      * Stops the HTTP server
      */
-    fun stop() {
+   public fun stop() {
         server.stop()
         coroutine.cancel()
     }

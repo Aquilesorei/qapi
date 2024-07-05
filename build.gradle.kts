@@ -35,6 +35,11 @@ dependencies {
     // https://mvnrepository.com/artifact/io.undertow/undertow-core
     implementation("io.undertow:undertow-core:2.3.14.Final")
 
+
+    implementation("io.swagger.core.v3:swagger-core:2.1.9")
+    implementation("io.swagger.core.v3:swagger-annotations:2.1.9")
+    implementation("io.swagger.core.v3:swagger-models:2.1.9")
+
 }
 
 tasks.test {

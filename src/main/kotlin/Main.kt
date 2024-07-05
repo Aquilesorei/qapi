@@ -54,12 +54,12 @@ class MyScope : RoutingScope() {
         if(a == 5) {
             throw Exception("they not like us")
         }
-        return HttpResponse(HttpStatus.OK,"$a + $b = ${a + b}")
+        return HttpResponse(status = HttpStatus.OK, content = "$a + $b = ${a + b}")
     }
 
     @Get("/hello/{lastname}/{name}")
     fun hello(lastname: String, name: String): HttpResponse{
-        return HttpResponse(HttpStatus.OK)
+        return HttpResponse(HttpStatus.OK , content = "Hello $lastname, $name", contentType = ContentType.TEXT_PLAIN)
     }
 
     @Post("/upload", multipartFiles = ["file", "file1"])
