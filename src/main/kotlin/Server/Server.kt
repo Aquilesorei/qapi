@@ -64,7 +64,7 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
             ).setDirectoryListingEnabled(false))
         } ?: PathHandler().apply {
             addPrefixPath("/", ResourceHandler(
-                PathResourceManager(Paths.get(System.getProperty("user.home")), 100)
+                PathResourceManager(Paths.get("./src/main/resources"), 100)
             ).setDirectoryListingEnabled(false))
         }
 
