@@ -3,16 +3,18 @@ package org.aquiles
 import com.andreapivetta.kolor.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import openapi.Property
 import org.aquiles.core.ContentType
 import org.aquiles.core.HttpRequest
 import org.aquiles.core.HttpResponse
 import org.aquiles.core.jsonResponse
 import org.aquiles.serialization.fromJson
-import org.http4k.core.MultipartFormBody
-import org.http4k.core.Request
-import org.http4k.core.Response
-import org.http4k.routing.path
+
 import kotlin.reflect.*
+import kotlin.reflect.full.primaryConstructor
+
+
+
 fun normalizePath(path: String): String {
     return path.replace(Regex("/{2,}"), "/")
 }
@@ -76,9 +78,9 @@ fun formatRoutePrefix(prefix: String?): String {
 
 
 
-    if (req.queryParameters.isEmpty() && req.pathParameters.isEmpty()){
+   /* if (req.queryParameters.isEmpty() && req.pathParameters.isEmpty()){
         return map
-    }
+    }*/
     parameters.forEach { param ->
         param.name?.let { name ->
             val res = req.query(name) ?: req.path(name)
@@ -137,8 +139,7 @@ private fun handleMultipartForm(request: HttpRequest, fields: Array<String>, fil
 fun logRequest(request: HttpRequest, response : HttpResponse) {
 
     print("INFO:  ".green())
-    print(request.uri.userInfo)
-    print(" \"${request.method.name} ${request.uri.path} ${request.version}\" ")
+    print(" \"${request.method.name} ${request.uri} ${request.version}\" ")
     if(response.statusCode.code >=400){
         println("${response.statusCode.code} ${response.statusCode.description}".red())
     }else{

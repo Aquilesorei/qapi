@@ -51,9 +51,6 @@ class MyScope : RoutingScope() {
 
     @Get("/add/{a}/{b}")
     fun add(a: Int, b: Int):HttpResponse{
-        if(a == 5) {
-            throw Exception("they not like us")
-        }
         return HttpResponse(status = HttpStatus.OK, content = "$a + $b = ${a + b}")
     }
 

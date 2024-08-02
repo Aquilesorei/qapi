@@ -1,6 +1,7 @@
 package org.aquiles
 
-import org.http4k.core.ContentType
+
+import org.aquiles.core.ContentType
 import java.io.File
 import java.io.InputStream
 import kotlin.reflect.KType

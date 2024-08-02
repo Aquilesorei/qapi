@@ -4,7 +4,7 @@ import core.*
 import io.undertow.server.HttpServerExchange
 import io.undertow.util.Headers
 import io.undertow.util.NetworkUtils
-import org.aquiles.Uri
+
 import java.net.InetSocketAddress
 import java.util.*
 
@@ -15,7 +15,7 @@ data class HttpRequest private  constructor(
     override var headers: MutableMap<String, HeaderValue>,
     override var body: Body,
     val method: HttpMethod,
-    val uri: Uri,
+    val uri: String,
     val queryParameters: MutableMap<String, Deque<String>>,
     val pathParameters: MutableMap<String, Deque<String>>,
     var multipartEntity: MultipartEntity? = null,
@@ -26,7 +26,7 @@ data class HttpRequest private  constructor(
 
     constructor(
         method: HttpMethod,
-        uri :Uri,
+        uri :String,
         status: Int,
         content: String,
         path: String,
@@ -85,7 +85,7 @@ data class HttpRequest private  constructor(
 
 
             exchange.startBlocking()
-            val uri = Uri.of(exchange.requestURI);
+            val uri = exchange.requestURI;
             val request = HttpRequest(
                 queryParameters = exchange.queryParameters,
                 pathParameters = exchange.pathParameters,

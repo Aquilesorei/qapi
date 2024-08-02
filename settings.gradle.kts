@@ -3,4 +3,4 @@ plugins {
 }
 rootProject.name = "qapi"
 
-includeBuild("./http4k")
+

@@ -16,12 +16,8 @@ import io.undertow.util.BadRequestException
 import io.undertow.util.HttpString
 import io.undertow.util.SameThreadExecutor
 import kotlinx.coroutines.*
-import openapi.Info
-import openapi.OpenAPIGenerator
-import openapi.OpenAPISpec
 import org.aquiles.core.*
 import org.aquiles.serialization.handleResponse
-import org.http4k.contract.ContractRoute
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
@@ -32,13 +28,16 @@ import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.instanceParameter
 import com.google.gson.Gson
+import io.undertow.server.handlers.PathHandler
+import openapi.*
+import kotlin.reflect.KProperty1
+
 class Router() {
     private val allRoutes = mutableListOf<RouteData>()
     private lateinit var server : HttpServer
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
-     private val employementContracts : MutableList<ContractRoute> = emptyList<ContractRoute>().toMutableList()
     private val routingHandler: RoutingHandler = Handlers.routing()
-     private var  resourceHandler : ResourceHandler? = null
+     private var  resourceHandler : PathHandler? = null
     private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
     init {
 
@@ -60,6 +59,7 @@ class Router() {
 
 
 
+/*
     private fun generateOpenAPISpec(): OpenAPISpec {
         val info = Info(
             version = "1.0.0",
@@ -73,6 +73,7 @@ class Router() {
         val spec = generateOpenAPISpec()
         println(Gson().toJson(spec))  // Use your preferred way to serialize and output the spec
     }
+*/
 
 
     /**
@@ -116,14 +117,78 @@ class Router() {
 
 
         val handler: HttpHandler = createFunctionHandler(scope,function,multipartFiles=multipartFiles, multipartFields = multipartFields)
+
         val prefixedPath = "${formatRoutePrefix(prefix)}$path"
 
         var h = applyScopeMiddleware(scope.scopeMiddleware(), handler)
         h = applyMiddleware(h, prefixedPath, scope.middleware())
 
 
+        val properties = mutableMapOf<String, Property>()
+        val parameters = mutableListOf<Parameter>()
+        val required = mutableListOf<String>()
 
-        allRoutes.add(RouteData(method.name,prefixedPath,h))
+
+
+        val  routeData= RouteData(method.name,prefixedPath,h)
+
+       OpenAPIGenerator.addPathItem(routeData)
+
+         function.parameters.forEach { param ->
+
+
+
+         param.name?.let {
+             if (!param.isOptional) {
+                 required.add(it) // add it hahahhah
+             }
+
+             val  prname = getOpenApiPrimitiveType(param.type)
+
+
+             if(param.type.isPrimitive()) {
+
+                 val constraints = mutableMapOf<String, Any>()
+                 val  format = getOpenApiFormat(param.type)
+                 format?.let { constraints["format"] = format }
+
+                 parameters.add(
+                     Parameter(
+                     name = it,
+                     description = it,
+                     `in` = if(path.contains(it)) "path" else "query",
+                     required = !param.isOptional,
+                     schema = OpenApiPrimitiveFactory.create(
+                         type = prname,
+                         constraints = constraints
+                     )
+                 ))
+             }else if(prname != "undefined"){
+                 properties[it] =   Property(
+                     type = getOpenApiPrimitiveType(param.type),
+                     required = !param.isOptional,
+                     readOnly =  true,
+                     example = createDummyInstance(param.type)
+                 )
+             }
+
+         }
+        }
+
+
+        val reqBod =  RequestBody(
+            content = mapOf(
+                "application/json" to MediaType(
+                    schema = Schema(
+                        properties=properties,
+                        required = required,
+                        description = "example value"
+                    ),
+                )
+            )
+        )
+
+        allRoutes.add(routeData)
 /*
         val contractRoute = createContractHandler(
             summary = convertToSentenceCase(function.name),
@@ -132,7 +197,7 @@ class Router() {
             method = method,
             contentType = ContentType.TEXT_PLAIN
         )
-        employementContracts.add(contractRoute)*/
+        employmentContracts.add(contractRoute)*/
     }
 
 
@@ -296,9 +361,14 @@ class Router() {
 
 
         val  directoryPath = Paths.get(directory)
-        if (Files.exists(directoryPath) && Files.isDirectory(directoryPath)) {
-            resourceHandler =  resource(PathResourceManager(directoryPath, 100)).setDirectoryListingEnabled(true)
 
+
+        val routingHandler = PathHandler()
+        if (Files.exists(directoryPath) && Files.isDirectory(directoryPath)) {
+            routingHandler.addPrefixPath(path, ResourceHandler(
+                PathResourceManager(directoryPath, 100)
+            ).setDirectoryListingEnabled(false))
+            resourceHandler = routingHandler
         } else {
          throw  FileNotFoundException("Directory does not exist")
         }

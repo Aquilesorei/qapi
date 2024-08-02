@@ -1,8 +1,8 @@
 package org.aquiles
 
-import org.http4k.core.toParameters
-import org.http4k.core.toUrlFormEncoded
 
+
+/*
 
 data class Uri(val scheme: String, val userInfo: String, val host: String, val port: Int?, val path: String, val query: String, val fragment: String) : Comparable<Uri> {
 
@@ -86,9 +86,11 @@ fun Uri.query(name: String, value: String?): Uri =
 fun Uri.queryParametersEncoded(): Uri =
     copy(query = query.toParameters().toUrlFormEncoded())
 
+*/
 /**
  * @see [RFC 3986, appendix A](https://www.ietf.org/rfc/rfc3986.txt)
- */
+ *//*
+
 private val validPathSegmentChars = setOf(
     '~', '-', '.', '_',                                // unreserved
     '!', '$', '&', '\'', '(', ')', '+', ',', ';', '=', // sub-delims
@@ -180,3 +182,4 @@ private fun String.normalizePath(): String {
 
     return output
 }
+*/

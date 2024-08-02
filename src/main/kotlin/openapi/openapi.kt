@@ -36,18 +36,41 @@ data class Operation(
     val parameters: List<Parameter> = emptyList(),
     val requestBody: RequestBody? = null, // generally for post ,put ...
     val responses: Map<String, Response>
-)
+){
 
 
+    companion object{
+         fun  sample(summary: String , operationId: String): Operation {
+             return    Operation(
+                 summary = summary,
+                 operationId =  operationId,
+                 tags = listOf("API"),
+                 responses = mapOf(
+                     "200" to Response(description = "Success"),
+                     "400" to Response(description = "Bad Request"),
+                     "404" to Response(description = "Not Found")
+                 ))
+
+         }
+    }
+}
+
+/**
+ * for query and path params
+ */
 data class Parameter(
     val name: String,
     val `in`: String,
     val description: String,
     val required: Boolean,
-    val schema: Schema
+    val schema: OpenApiPrimitive
 )
 
-
+/**
+ *
+ * Represent the data that  is  being  sent using post or put   by client
+ * @param content   :  a map of content-type to  the  schema
+ */
 data class RequestBody(
     val content: Map<String, MediaType>
 )

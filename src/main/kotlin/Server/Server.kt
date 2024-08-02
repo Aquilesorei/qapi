@@ -6,6 +6,7 @@ import io.undertow.Undertow
 import io.undertow.UndertowOptions.ENABLE_HTTP2
 import io.undertow.server.HttpServerExchange
 import io.undertow.server.RoutingHandler
+import io.undertow.server.handlers.PathHandler
 import io.undertow.server.handlers.form.FormDataParser
 import io.undertow.server.handlers.resource.PathResourceManager
 import io.undertow.server.handlers.resource.ResourceHandler
@@ -18,13 +19,12 @@ import kotlinx.coroutines.launch
 import org.aquiles.core.HttpHandler
 import org.aquiles.core.HttpRequest
 import org.aquiles.core.HttpResponse
-import org.http4k.multipart.MultipartFile
 import java.io.IOException
 import java.nio.file.Paths
 
 
 class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val routes: MutableList<RouteData>,
-                 private val resourceHandler: ResourceHandler?, val  routingHandler: RoutingHandler
+                 private var resourceHandler: PathHandler?, val  routingHandler: RoutingHandler
 ) {
     private lateinit var server: Undertow
 
@@ -57,6 +57,18 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
                 exchange.responseSender.send("Invalid user ID")
             }
         }*/
+        // Default resource handler for other content
+        resourceHandler = resourceHandler?.apply {
+            addPrefixPath("/", ResourceHandler(
+                PathResourceManager(Paths.get("./src/main/resources"), 100)
+            ).setDirectoryListingEnabled(false))
+        } ?: PathHandler().apply {
+            addPrefixPath("/", ResourceHandler(
+                PathResourceManager(Paths.get(System.getProperty("user.home")), 100)
+            ).setDirectoryListingEnabled(false))
+        }
+
+
 
         //val rootHandler = CoroutinesHandlerAdapter(routes);
         server = Undertow.builder()
@@ -64,12 +76,11 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
             .setServerOption(ENABLE_HTTP2, false)
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
             .setHandler(resourceHandler)
-            .setHandler(resource( PathResourceManager(Paths.get(System.getProperty("user.home")), 100))
-            .setDirectoryListingEnabled(true))
             .build()
         server.start()
         println("Server started on $host:$port")
     }
+    //.setHandler(resource( PathResourceManager(Paths.get(System.getProperty("user.home")), 100))
 
 
 

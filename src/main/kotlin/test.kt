@@ -1,40 +1,67 @@
 /*
+import org.aquiles.createDummyInstance
+import kotlin.reflect.*
+import kotlin.reflect.full.createType
+import kotlin.reflect.full.primaryConstructor
 
 
-import com.google.gson.Gson
-import io.undertow.server.HttpHandler
-import io.undertow.server.HttpServerExchange
-import io.undertow.util.Headers
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.media.Content
-import io.swagger.v3.oas.annotations.media.Schema
-import java.time.YearMonth
 
-@Path("/api/demo")
-class DemoHandler : HttpHandler {
+// Example data class
+data class Student(
+    val classroom_name: String,
+    val level: String,
+    val firstname: String,
+    val lastname: String,
+    val gender: String,
+    val dob: String,
+    val cob: String,
+    val parent_name: String,
+    val parent_phones: List<String>,
+    val passe: Boolean,
+    val scholarship: Boolean,
+    val matricule: String
+)
 
-    override fun handleRequest(exchange: HttpServerExchange) {
-        exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
-        val params = exchange.queryParameters
-        val month = params["month"]?.first?.toInt() ?: 0
-        val year = params["year"]?.first?.toInt() ?: 0
-        exchange.responseSender.send(Gson().toJson(getDaysIn(year, month)))
-    }
+fun main() {
+    val kType = Student::class.createType()
+    */
+/*val dummyInstance = createDummyInstance(kType)
+    println(dummyInstance)*//*
 
-    @GET
-    @Operation(
-        summary = "Get number of days in the given month and year",
-        responses = [
-            ApiResponse(
-                responseCode = "200",
-                description = "A number of days in the given month and year",
-                content = [Content(mediaType = "application/json", schema = Schema(implementation = Int::class))]
-            )
-        ]
-    )
-    fun getDaysIn( year: Int,month: Int): Int {
-        return YearMonth.of(year, month).lengthOfMonth()
-    }
 }
 */
+
+
+
+import io.undertow.Undertow
+import io.undertow.server.handlers.PathHandler
+import io.undertow.server.handlers.resource.PathResourceManager
+import io.undertow.server.handlers.resource.ResourceHandler
+import io.undertow.UndertowOptions.ENABLE_HTTP2
+import java.nio.file.Paths
+
+fun main() {
+    val port = 8080 // Default port
+    val host = "0.0.0.0" // Listen on all interfaces
+    val downloadDir = System.getProperty("user.home") + "/Downloads" // Customize download directory
+
+    val routingHandler = PathHandler()
+
+    // Download route
+    routingHandler.addPrefixPath("/download", ResourceHandler(
+        PathResourceManager(Paths.get(downloadDir), 100)
+    ).setDirectoryListingEnabled(false)) // Disable directory listing
+
+    // Default resource handler for other content
+    routingHandler.addPrefixPath("/", ResourceHandler(
+        PathResourceManager(Paths.get(System.getProperty("user.home")), 100)
+    ).setDirectoryListingEnabled(false))
+
+    val server = Undertow.builder()
+        .addHttpListener(port, host, routingHandler)
+        .setServerOption(ENABLE_HTTP2, false)
+        .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
+        .build()
+
+    server.start()
+}
