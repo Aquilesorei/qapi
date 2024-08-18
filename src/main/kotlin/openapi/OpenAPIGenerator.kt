@@ -7,8 +7,7 @@ object OpenAPIGenerator {
     val paths = mutableMapOf<String, PathItem>()
     val components = Components()
 
-    /*
-        fun generateOpenAPISpec(info: Info): OpenAPISpec {
+        fun generateOpenAPISpec(info: Info,routes : List<RouteData>): OpenAPISpec {
 
 
             routes.forEach { route ->
@@ -17,7 +16,6 @@ object OpenAPIGenerator {
 
             return OpenAPISpec(info = info, paths = paths, components = components)
         }
-    */
 
 
     fun addPathItem(block: (MutableMap<String, PathItem>) -> Unit) {
@@ -26,10 +24,14 @@ object OpenAPIGenerator {
     }
     fun addPathItem(route: RouteData ) {
         val pathItem = paths.computeIfAbsent(route.path) { PathItem() }
-        val operation = Operation.sample(
+        var operation = Operation.sample(
         summary = "Operation for ${route.path}",
         operationId = route.path.trim('/').replace("/", "_"),
         )
+
+        // todo : get the parameters from the underlying
+        operation = operation.copy()
+
 
         when (route.method) {
             "GET" -> pathItem.copy(get = operation)

@@ -81,6 +81,9 @@ fun formatRoutePrefix(prefix: String?): String {
    /* if (req.queryParameters.isEmpty() && req.pathParameters.isEmpty()){
         return map
     }*/
+
+
+    val contentType = req.getHeader("Content-Type")
     parameters.forEach { param ->
         param.name?.let { name ->
             val res = req.query(name) ?: req.path(name)
@@ -88,7 +91,7 @@ fun formatRoutePrefix(prefix: String?): String {
                 castBasedOnType(res, param.type)?.let {
                     map[param] = it
                 }
-            } else if (req.getHeader("Content-Type") == "application/json") {
+            } else if (contentType == "application/json") {
 
 
 
@@ -100,7 +103,7 @@ fun formatRoutePrefix(prefix: String?): String {
                     map[param] = it
                 }
 
-            } else{
+            } else if(contentType?.startsWith("multipart/form-data") == true){
 
                 val files = handleMultipartForm(req, files = multipartFiles, fields = multipartFields)
                 when {

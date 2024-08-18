@@ -21,10 +21,19 @@ import org.aquiles.core.HttpRequest
 import org.aquiles.core.HttpResponse
 import java.io.IOException
 import java.nio.file.Paths
+import java.security.KeyStore
+import java.security.SecureRandom
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
+//keytool -genkeypair -alias undertow -keyalg RSA -keystore keystore.jks -storepass your_keystore_password -keypass your_key_password
 
+class HttpServer(
+    val port: Int,
+    private val host: String ="0.0.0.0",
+    private val routes: MutableList<RouteData>,
+    private var resourceHandler: PathHandler?, val  routingHandler: RoutingHandler,
 
-class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val routes: MutableList<RouteData>,
-                 private var resourceHandler: PathHandler?, val  routingHandler: RoutingHandler
 ) {
     private lateinit var server: Undertow
 
@@ -34,29 +43,7 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
 
     fun start() {
 
-     /*   val router = io.undertow.Handlers.routing()
-
-        // Route with a path parameter
-        router.get("/users/{userId}") { exchange ->
-            val userId = exchange.pathParameters["userId"]?.firstOrNull()
-
-            if (userId != null) {
-                // Fetch user data based on userId (e.g., from a database)
-                val userData = getUserData(userId)
-
-                if (userData != null) {
-                    exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
-                    exchange.statusCode = StatusCodes.OK
-                    exchange.responseSender.send(userData.toString()) // Assuming userData can be serialized to JSON
-                } else {
-                    exchange.statusCode = StatusCodes.NOT_FOUND
-                    exchange.responseSender.send("User not found")
-                }
-            } else {
-                exchange.statusCode = StatusCodes.BAD_REQUEST
-                exchange.responseSender.send("Invalid user ID")
-            }
-        }*/
+        val sslContext = createSSLContext()
         // Default resource handler for other content
         resourceHandler = resourceHandler?.apply {
             addPrefixPath("/", ResourceHandler(
@@ -90,7 +77,24 @@ class HttpServer(val port: Int, private val host: String ="0.0.0.0", private val
 
     fun stop() = server.stop()
 
+    private fun createSSLContext(): SSLContext {
+        val keyStorePath = "path/to/keystore.jks"
+        val keyStorePassword = "your_keystore_password".toCharArray()
+        val keyPassword = "your_key_password".toCharArray()
 
+        val keyStore = KeyStore.getInstance("JKS")
+        keyStore.load(javaClass.getResourceAsStream(keyStorePath), keyStorePassword)
+
+        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        keyManagerFactory.init(keyStore, keyPassword)
+
+        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        trustManagerFactory.init(keyStore)
+
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, SecureRandom())
+        return sslContext
+    }
 }
 
 

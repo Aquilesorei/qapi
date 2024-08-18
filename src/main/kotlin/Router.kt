@@ -30,9 +30,10 @@ import kotlin.reflect.full.instanceParameter
 import com.google.gson.Gson
 import io.undertow.server.handlers.PathHandler
 import openapi.*
+import java.io.File
 import kotlin.reflect.KProperty1
 
-class Router() {
+class Router {
     private val allRoutes = mutableListOf<RouteData>()
     private lateinit var server : HttpServer
     private var globalMiddleware: MutableSet<HttpMiddleware> = mutableSetOf()
@@ -59,21 +60,22 @@ class Router() {
 
 
 
-/*
     private fun generateOpenAPISpec(): OpenAPISpec {
         val info = Info(
             version = "1.0.0",
             title = "API Specification Example"
         )
-        val generator = OpenAPIGenerator(allRoutes)
-        return generator.generateOpenAPISpec(info)
+        return OpenAPIGenerator.generateOpenAPISpec(info,allRoutes)
     }
 
     fun printOpenAPISpec() {
         val spec = generateOpenAPISpec()
-        println(Gson().toJson(spec))  // Use your preferred way to serialize and output the spec
+        println()
+
+        val file = File("./src/main/resources/test.js")
+        file.writeText("const spec = ${Gson().toJson(spec)}")
+        println("File written successfully")
     }
-*/
 
 
     /**
@@ -454,7 +456,7 @@ class Router() {
     /**
      * Stops the HTTP server
      */
-   public fun stop() {
+    fun stop() {
         server.stop()
         coroutine.cancel()
     }

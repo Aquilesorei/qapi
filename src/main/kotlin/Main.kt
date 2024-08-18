@@ -34,6 +34,12 @@ class MyScope : RoutingScope() {
         return  42
     }
 
+    @Get("/test")
+    fun test(): String {
+        return  "test"
+    }
+
+
 
     @Get("/delay")
     suspend fun delayedResponse(): HttpResponse {
@@ -88,7 +94,8 @@ fun main() {
     router.addScope(MyScope(),prefix = "/api")
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
-        .start(9000)
+
+    router.printOpenAPISpec();
 
 
 
