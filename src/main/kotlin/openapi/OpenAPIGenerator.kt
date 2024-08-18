@@ -1,20 +1,18 @@
 package openapi
 
 import core.RouteData
+import kotlin.reflect.KCallable
 
 
 object OpenAPIGenerator {
-    val paths = mutableMapOf<String, PathItem>()
-    val components = Components()
+    private val paths = mutableMapOf<String, PathItem>()
+    private val components = Components()
 
-        fun generateOpenAPISpec(info: Info,routes : List<RouteData>): OpenAPISpec {
+        fun generateOpenAPISpec(info: Info, servers : List<OpenApiServer> = listOf(), host : String,
+                                 basePath : String? = null,
+                                 schemes  : List<String> = listOf(),): OpenAPISpec {
 
-
-            routes.forEach { route ->
-                addPathItem(route)
-            }
-
-            return OpenAPISpec(info = info, paths = paths, components = components)
+            return OpenAPISpec(info = info, paths = paths, components = components, servers = servers, host = host, schemes = schemes, basePath = basePath)
         }
 
 
@@ -22,15 +20,76 @@ object OpenAPIGenerator {
 
         block(paths)
     }
-    fun addPathItem(route: RouteData ) {
+    fun addPathItem(route: RouteData ,function : KCallable<*>) {
         val pathItem = paths.computeIfAbsent(route.path) { PathItem() }
+        val properties = mutableMapOf<String, Property>()
+        val parameters = mutableListOf<Parameter>()
+        val required = mutableListOf<String>()
+
+        function.parameters.forEach { param ->
+
+
+
+            param.name?.let {
+                if (!param.isOptional) {
+                    required.add(it) // add it hahahhah
+                }
+
+                val  prname = getOpenApiPrimitiveType(param.type)
+
+
+                if(param.type.isPrimitive()) {
+
+                    val constraints = mutableMapOf<String, Any>()
+                    val  format = getOpenApiFormat(param.type)
+                    format?.let { constraints["format"] = format }
+
+                    parameters.add(
+                        Parameter(
+                            name = it,
+                            description = "",
+                            `in` = if(route.path.contains(it)) "path" else "query",
+                            required = !param.isOptional,
+                            schema = OpenApiPrimitiveFactory.create(
+                                type = prname,
+                                constraints = constraints
+                            )
+                        ))
+                }else if(prname != "undefined"){
+                    properties[it] =   Property(
+                        type = getOpenApiPrimitiveType(param.type),
+                        required = !param.isOptional,
+                        readOnly =  true,
+                        example = createDummyInstance(param.type)
+                    )
+                }
+
+            }
+        }
+
+
+        val reqBod =  RequestBody(
+            content = mapOf(
+                "application/json" to MediaType(
+                    schema = Schema(
+                        properties=properties,
+                        required = required,
+                        description = "example value"
+                    ),
+                )
+            )
+        )
+
         var operation = Operation.sample(
         summary = "Operation for ${route.path}",
         operationId = route.path.trim('/').replace("/", "_"),
         )
 
         // todo : get the parameters from the underlying
-        operation = operation.copy()
+        operation = operation.copy(
+            parameters = parameters,
+           // requestBody = reqBod
+        )
 
 
         when (route.method) {

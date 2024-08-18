@@ -94,8 +94,8 @@ fun main() {
     router.addScope(MyScope(),prefix = "/api")
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
+        .start(9000)
 
-    router.printOpenAPISpec();
 
 
 

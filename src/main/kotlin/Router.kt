@@ -5,20 +5,25 @@ package org.aquiles
 //kotlin reflect
 
 import Server.HttpServer
+import com.google.gson.Gson
 import core.RouteData
 import io.undertow.Handlers
-import io.undertow.Handlers.resource
 import io.undertow.server.HttpServerExchange
 import io.undertow.server.RoutingHandler
+import io.undertow.server.handlers.PathHandler
 import io.undertow.server.handlers.resource.PathResourceManager
 import io.undertow.server.handlers.resource.ResourceHandler
 import io.undertow.util.BadRequestException
+import io.undertow.util.Headers
 import io.undertow.util.HttpString
 import io.undertow.util.SameThreadExecutor
 import kotlinx.coroutines.*
+import openapi.*
 import org.aquiles.core.*
 import org.aquiles.serialization.handleResponse
+import java.io.File
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.file.Files
@@ -27,11 +32,7 @@ import kotlin.reflect.KCallable
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.instanceParameter
-import com.google.gson.Gson
-import io.undertow.server.handlers.PathHandler
-import openapi.*
-import java.io.File
-import kotlin.reflect.KProperty1
+
 
 class Router {
     private val allRoutes = mutableListOf<RouteData>()
@@ -60,21 +61,37 @@ class Router {
 
 
 
-    private fun generateOpenAPISpec(): OpenAPISpec {
+    private fun generateOpenAPISpec(port: Int): OpenAPISpec {
         val info = Info(
             version = "1.0.0",
-            title = "API Specification Example"
+            title = "QAPI",
+
         )
-        return OpenAPIGenerator.generateOpenAPISpec(info,allRoutes)
+
+        return OpenAPIGenerator.generateOpenAPISpec(
+            info,
+            host = "localhost:${port}",
+            schemes = listOf("http"),
+            servers = listOf(
+            OpenApiServer(
+                url = "http://localhost:${port}",
+                description = ""
+            )
+        )
+        )
     }
 
-    fun printOpenAPISpec() {
-        val spec = generateOpenAPISpec()
+    fun printOpenAPISpec(port: Int) {
+        val spec = generateOpenAPISpec(port)
         println()
 
         val file = File("./src/main/resources/test.js")
         file.writeText("const spec = ${Gson().toJson(spec)}")
         println("File written successfully")
+
+
+      serveDocs();
+
     }
 
 
@@ -126,69 +143,12 @@ class Router {
         h = applyMiddleware(h, prefixedPath, scope.middleware())
 
 
-        val properties = mutableMapOf<String, Property>()
-        val parameters = mutableListOf<Parameter>()
-        val required = mutableListOf<String>()
-
-
 
         val  routeData= RouteData(method.name,prefixedPath,h)
 
-       OpenAPIGenerator.addPathItem(routeData)
-
-         function.parameters.forEach { param ->
+       OpenAPIGenerator.addPathItem(routeData,function)
 
 
-
-         param.name?.let {
-             if (!param.isOptional) {
-                 required.add(it) // add it hahahhah
-             }
-
-             val  prname = getOpenApiPrimitiveType(param.type)
-
-
-             if(param.type.isPrimitive()) {
-
-                 val constraints = mutableMapOf<String, Any>()
-                 val  format = getOpenApiFormat(param.type)
-                 format?.let { constraints["format"] = format }
-
-                 parameters.add(
-                     Parameter(
-                     name = it,
-                     description = it,
-                     `in` = if(path.contains(it)) "path" else "query",
-                     required = !param.isOptional,
-                     schema = OpenApiPrimitiveFactory.create(
-                         type = prname,
-                         constraints = constraints
-                     )
-                 ))
-             }else if(prname != "undefined"){
-                 properties[it] =   Property(
-                     type = getOpenApiPrimitiveType(param.type),
-                     required = !param.isOptional,
-                     readOnly =  true,
-                     example = createDummyInstance(param.type)
-                 )
-             }
-
-         }
-        }
-
-
-        val reqBod =  RequestBody(
-            content = mapOf(
-                "application/json" to MediaType(
-                    schema = Schema(
-                        properties=properties,
-                        required = required,
-                        description = "example value"
-                    ),
-                )
-            )
-        )
 
         allRoutes.add(routeData)
 /*
@@ -417,6 +377,7 @@ class Router {
                 }
         }
 
+        printOpenAPISpec(port)
        server = HttpServer(port, routes = allRoutes, resourceHandler = resourceHandler, routingHandler = routingHandler)
         server.start()
         println("Server started at http://localhost:${server.port()}/")
@@ -430,6 +391,49 @@ class Router {
 
 
 
+
+
+    private fun serveDocs(){
+
+        // todo : hande serving all other files including js file
+
+        fun serve(path: String,exchange: HttpServerExchange,contentType : String){
+
+            exchange.dispatch(SameThreadExecutor.INSTANCE, Runnable {
+                coroutine.launch {
+                    val filePath = Paths.get(path) //
+                    exchange.startBlocking()
+
+                    try {
+                        exchange.responseHeaders.put(Headers.CONTENT_TYPE, contentType)
+                        Files.newInputStream(filePath).use { inputStream ->
+                            inputStream.transferTo(exchange.outputStream)
+                        }
+                    } catch (e: IOException) {
+                        exchange.statusCode = 500
+                        e.printStackTrace()  // Log the error for debugging purposes
+                    } finally {
+                        if (!exchange.isComplete) {
+                            exchange.endExchange()
+                        }
+                    }
+                }
+
+            })
+
+        }
+        routingHandler.add(HttpString("GET"), "/docs") { exchange ->
+
+
+            serve("./src/main/resources/index.html",exchange,"text/html")
+        }
+        routingHandler.add(HttpString("GET"), "/docssc") { exchange ->
+            serve("./src/main/resources/script.js",exchange,"script/js")
+        }
+        routingHandler.add(HttpString("GET"), "/docsspec.js") { exchange ->
+            serve("./src/main/resources/test.js",exchange,"script/js")
+        }
+    }
     private fun sendHttpResponse(exchange: HttpServerExchange, response: HttpResponse) {
         exchange.statusCode = response.statusCode.code
         response.headers.forEach { (name, value) ->

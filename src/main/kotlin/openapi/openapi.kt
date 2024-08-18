@@ -6,10 +6,18 @@ typealias Name = String
 data class OpenAPISpec(
     val openapi: String = "3.0.1",
     val info: Info,
+    val servers : List<OpenApiServer> = listOf(),
     val paths: Map<String, PathItem> = emptyMap(),
-    val components: Components = Components()
+    val components: Components = Components(),
+    val  host : String,
+    val basePath : String? = null,
+    val schemes  : List<String> = listOf(),
 )
 
+data class  OpenApiServer(
+    val url : String,
+    val description : String,
+)
 
 data class Info(
     val version: String,
