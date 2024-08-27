@@ -1,6 +1,7 @@
 package openapi
 
 import core.RouteData
+import org.aquiles.convertToSentenceCase
 import kotlin.reflect.KCallable
 
 
@@ -8,9 +9,13 @@ object OpenAPIGenerator {
     private val paths = mutableMapOf<String, PathItem>()
     private val components = Components()
 
-        fun generateOpenAPISpec(info: Info, servers : List<OpenApiServer> = listOf(), host : String,
-                                 basePath : String? = null,
-                                 schemes  : List<String> = listOf(),): OpenAPISpec {
+        fun generateOpenAPISpec(
+            info: Info,
+            servers : List<OpenApiServer> = listOf(),
+            host : String,
+            basePath : String? = null, //e.g /v2
+            schemes  : List<String> = listOf(),
+            ): OpenAPISpec {
 
             return OpenAPISpec(info = info, paths = paths, components = components, servers = servers, host = host, schemes = schemes, basePath = basePath)
         }
@@ -81,7 +86,7 @@ object OpenAPIGenerator {
         )
 
         var operation = Operation.sample(
-        summary = "Operation for ${route.path}",
+        summary = convertToSentenceCase(function.name),
         operationId = route.path.trim('/').replace("/", "_"),
         )
 
