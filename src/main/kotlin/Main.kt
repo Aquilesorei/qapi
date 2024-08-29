@@ -5,6 +5,7 @@ package org.aquiles
 
 import kotlinx.coroutines.delay
 import Server.HttpServer
+import core.QSslConfig
 import  org.aquiles.core.HttpStatus
 import org.aquiles.core.*
 
@@ -94,7 +95,13 @@ fun main() {
     router.addScope(MyScope(),prefix = "/api")
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
-        .start(9000)
+        .start(9000,
+            sslConfig = QSslConfig(
+            keyStorePath = "./keystore.jks",
+            keyStorePassword = "passwordd",
+            keyPassword = "passwordd"
+        )
+        )
 
 
 

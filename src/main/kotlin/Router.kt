@@ -6,6 +6,7 @@ package org.aquiles
 
 import Server.HttpServer
 import com.google.gson.Gson
+import core.QSslConfig
 import core.RouteData
 import io.undertow.Handlers
 import io.undertow.server.HttpServerExchange
@@ -71,24 +72,23 @@ class Router {
         return OpenAPIGenerator.generateOpenAPISpec(
             info,
             host = "localhost:${port}",
-            schemes = listOf("http"),
+            schemes = listOf("https"),
             servers = listOf(
             OpenApiServer(
-                url = "http://localhost:${port}",
+                url = "https://localhost:${port}",
                 description = ""
             )
         )
         )
     }
 
-    fun printOpenAPISpec(port: Int) {
+    private fun printOpenAPISpec(port: Int) {
         val spec = generateOpenAPISpec(port)
         println()
 
         val file = File("./src/main/resources/test.js")
         file.writeText("const spec = ${Gson().toJson(spec)}")
         println("File written successfully")
-
 
       serveDocs();
 
@@ -347,7 +347,7 @@ class Router {
     /**
      * Starts the HTTP server on the given port
      */
-    fun start(port : Int) {
+    fun start(port : Int,sslConfig : QSslConfig? =null) {
 
         for(md in  globalMiddleware){
 
@@ -378,9 +378,9 @@ class Router {
         }
 
         printOpenAPISpec(port)
-       server = HttpServer(port, routes = allRoutes, resourceHandler = resourceHandler, routingHandler = routingHandler)
+       server = HttpServer(port, routes = allRoutes, resourceHandler = resourceHandler, routingHandler = routingHandler, sslConfig = sslConfig)
         server.start()
-        println("Server started at http://localhost:${server.port()}/")
+        println("Server started at http${if (sslConfig != null ) "s" else ""}://localhost:${server.port()}/")
         println("Press Enter to stop the server.")
         readlnOrNull()
 
@@ -395,7 +395,6 @@ class Router {
 
     private fun serveDocs(){
 
-        // todo : hande serving all other files including js file
 
         fun serve(path: String,exchange: HttpServerExchange,contentType : String){
 

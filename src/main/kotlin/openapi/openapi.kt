@@ -54,8 +54,11 @@ data class Operation(
                  operationId =  operationId,
                  tags = listOf("API"),
                  responses = mapOf(
-                     "200" to Response(description = "Success"),
-                     "400" to Response(description = "Bad Request"),
+                     "200" to Response(description = "Success",
+                         content = mapOf(
+                         "application/json" to  MediaType(schema = Schema(example = "string", description = "example value")),
+                     )),
+                     "400" to Response(description = "Bad Request",),
                      "404" to Response(description = "Not Found")
                  ))
 
