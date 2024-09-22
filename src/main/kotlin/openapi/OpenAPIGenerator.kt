@@ -2,6 +2,7 @@ package openapi
 
 import core.RouteData
 import org.aquiles.convertToSentenceCase
+import org.aquiles.core.HttpMethod
 import kotlin.reflect.KCallable
 
 
@@ -25,15 +26,14 @@ object OpenAPIGenerator {
 
         block(paths)
     }
-    fun addPathItem(route: RouteData ,function : KCallable<*>) {
+    fun addPathItem(route: RouteData, function : KCallable<*>, method : HttpMethod,) {
         val pathItem = paths.computeIfAbsent(route.path) { PathItem() }
         val properties = mutableMapOf<String, Property>()
         val parameters = mutableListOf<Parameter>()
         val required = mutableListOf<String>()
+        var body : RequestBody? = null
 
         function.parameters.forEach { param ->
-
-
 
             param.name?.let {
                 if (!param.isOptional) {
@@ -60,7 +60,24 @@ object OpenAPIGenerator {
                                 constraints = constraints
                             )
                         ))
-                }else if(prname != "undefined"){
+                }else if(param.type.isDataClass()){
+
+                    if(method == HttpMethod.PUT || method == HttpMethod.POST){
+                        body =  RequestBody(
+                            content = mapOf(
+                                "application/json" to MediaType(
+                                    schema = Schema(
+                                        properties=properties,
+                                        required = required,
+                                        description = "example value",
+                                        example = createDummyInstance(param.type)
+                                    ),
+                                )
+                            )
+                        )
+                    }
+                }
+                else if(prname != "undefined"){
                     properties[it] =   Property(
                         type = getOpenApiPrimitiveType(param.type),
                         required = !param.isOptional,
@@ -73,17 +90,7 @@ object OpenAPIGenerator {
         }
 
 
-        val reqBod =  RequestBody(
-            content = mapOf(
-                "application/json" to MediaType(
-                    schema = Schema(
-                        properties=properties,
-                        required = required,
-                        description = "example value"
-                    ),
-                )
-            )
-        )
+
 
         var operation = Operation.sample(
         summary = convertToSentenceCase(function.name),
@@ -92,8 +99,9 @@ object OpenAPIGenerator {
 
         // todo : get the parameters from the underlying
         operation = operation.copy(
+
             parameters = parameters,
-           // requestBody = reqBod
+           requestBody = body
         )
 
 

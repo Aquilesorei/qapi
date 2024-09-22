@@ -61,6 +61,12 @@ fun KType.isPrimitive(): Boolean {
     return this.classifier == String::class || this.classifier == Int::class || this.classifier == Long::class || this.classifier == Float::class || this.classifier == Boolean::class || this.classifier == Double::class
 }
 
+
+
+fun KType.isDataClass(): Boolean {
+    val kClass = this.classifier as? KClass<*> // Get the KClass from the KType
+    return kClass?.isData ?: false // Check if the KClass represents a data class
+}
 fun createDummyInstance(kType: KType): Any? {
     val classifier = kType.classifier as? KClass<*> ?: return null
 
@@ -86,7 +92,7 @@ fun createDummyInstance(kType: KType): Any? {
                 // Create instance with dummy values
                 primaryConstructor.callBy(args)
             } catch (e: Exception) {
-                e.printStackTrace()
+               // e.printStackTrace()
                 null
             }
         }

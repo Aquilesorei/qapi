@@ -13,11 +13,11 @@
 <div id="swagger-ui"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui-bundle.js"> </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.5/swagger-ui-standalone-preset.js"> </script>
-<script src="https://localhost:9000/docsspec.js"> </script>
+
 <script>
     window.onload = function() {
         const ui = SwaggerUIBundle({
-            spec: spec,
+            url  : "http://localhost:9000/openapi.json",
             dom_id: '#swagger-ui',
             deepLinking: true,
             presets: [

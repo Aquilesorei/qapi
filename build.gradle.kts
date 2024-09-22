@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.9.23"
+    `java-library`
 }
 
 group = "org.aquiles"

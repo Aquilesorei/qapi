@@ -85,7 +85,7 @@ class Route(
 
 
 
-val  myRoutes = listOf(
+internal val  myRoutes = listOf(
     Route(
         method = GET,
         path = "/",

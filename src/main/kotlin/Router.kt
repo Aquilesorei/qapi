@@ -22,14 +22,13 @@ import kotlinx.coroutines.*
 import openapi.*
 import org.aquiles.core.*
 import org.aquiles.serialization.handleResponse
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.IOException
+import java.io.*
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.reflect.KCallable
+import kotlin.reflect.full.callSuspend
 import kotlin.reflect.full.callSuspendBy
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.instanceParameter
@@ -57,6 +56,7 @@ class Router {
             }
         )
     }
+    var specJson  : String? = null;
 
 
 
@@ -75,7 +75,7 @@ class Router {
             schemes = listOf("https"),
             servers = listOf(
             OpenApiServer(
-                url = "https://localhost:${port}",
+                url = "http://localhost:${port}",
                 description = ""
             )
         )
@@ -84,11 +84,8 @@ class Router {
 
     private fun printOpenAPISpec(port: Int) {
         val spec = generateOpenAPISpec(port)
-        println()
 
-        val file = File("./src/main/resources/test.js")
-        file.writeText("const spec = ${Gson().toJson(spec)}")
-        println("File written successfully")
+        specJson = Gson().toJson(spec);
 
       serveDocs();
 
@@ -146,7 +143,7 @@ class Router {
 
         val  routeData= RouteData(method.name,prefixedPath,h)
 
-       OpenAPIGenerator.addPathItem(routeData,function)
+       OpenAPIGenerator.addPathItem(routeData,function,method)
 
 
 
@@ -295,16 +292,34 @@ class Router {
 
             coroutine.launch(Dispatchers.IO) {
                 try {
-                    val params = processParams(function.parameters, req, multipartFields, multipartFiles)
-                    params[function.instanceParameter!!] = scope
-                    val res = if (function.isSuspend) function.callSuspendBy(params) else function.callBy(params)
-                    responseCompletable.complete(handleResponse(res))
+                    // Check if the function has no parameters
+                    if (function.parameters.isEmpty()) {
+                        // Call function without any parameters
+                        val res = if (function.isSuspend) function.callSuspend() else function.call()
+                        responseCompletable.complete(handleResponse(res))
+                    } else {
+                        val params = processParams(function.parameters, req, multipartFields, multipartFiles)
+
+                    /*    // Handle the case where the only parameter is of type HttpRequest
+                        if (function.parameters.size == 1 && function.parameters.first().type.classifier == HttpRequest::class) {
+                            params[function.parameters.first()] = req // Map HttpRequest to the function's parameter
+                        }
+*/
+                        // Handle the case where there are instance parameters (e.g., bound to `scope`)
+                        if (function.instanceParameter != null) {
+                            params[function.instanceParameter!!] = scope
+                        }
+
+                        // Call the function with the mapped parameters
+                        val res = if (function.isSuspend) function.callSuspendBy(params) else function.callBy(params)
+                        responseCompletable.complete(handleResponse(res))
+                    }
                 } catch (e: BadRequestException) {
                     e.printStackTrace()
-                    responseCompletable.complete(HttpResponse(HttpStatus.BAD_REQUEST,"Bad Request"))
+                    responseCompletable.complete(HttpResponse(HttpStatus.BAD_REQUEST, "Bad Request"))
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    responseCompletable.complete(HttpResponse(HttpStatus.INTERNAL_SERVER_ERROR,"Internal server error"))
+                    responseCompletable.complete(HttpResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error"))
                 }
             }
 
@@ -313,6 +328,7 @@ class Router {
             }
         }
     }
+
 
 
     /**
@@ -400,12 +416,23 @@ class Router {
 
             exchange.dispatch(SameThreadExecutor.INSTANCE, Runnable {
                 coroutine.launch {
-                    val filePath = Paths.get(path) //
+                    //val filePath = Paths.get(path)
+
                     exchange.startBlocking()
 
                     try {
+
+
                         exchange.responseHeaders.put(Headers.CONTENT_TYPE, contentType)
-                        Files.newInputStream(filePath).use { inputStream ->
+
+                        val classLoader = this::class.java.classLoader // Or use another appropriate class loader
+
+                        var fileInputStream: InputStream? = classLoader.getResourceAsStream(path)
+                        if (fileInputStream == null) {
+                            fileInputStream = FileInputStream(path)
+                        }
+
+                        fileInputStream.use { inputStream ->
                             inputStream.transferTo(exchange.outputStream)
                         }
                     } catch (e: IOException) {
@@ -421,16 +448,33 @@ class Router {
             })
 
         }
+
+        fun serveText(content: String, exchange: HttpServerExchange, contentType: String) {
+            exchange.dispatch(SameThreadExecutor.INSTANCE, Runnable {
+                coroutine.launch {
+                    exchange.startBlocking()
+
+                    try {
+                        exchange.responseHeaders.put(Headers.CONTENT_TYPE, contentType)
+                        exchange.responseSender.send(content) // Send the text content
+                    } catch (e: IOException) {
+                        exchange.statusCode = 500
+                        e.printStackTrace()
+                    } finally {
+                        if (!exchange.isComplete) {
+                            exchange.endExchange()
+                        }
+                    }
+                }
+            })
+        }
+
         routingHandler.add(HttpString("GET"), "/docs") { exchange ->
 
-
-            serve("./src/main/resources/index.html",exchange,"text/html")
+            serve("index.html",exchange,"text/html")
         }
-        routingHandler.add(HttpString("GET"), "/docssc") { exchange ->
-            serve("./src/main/resources/script.js",exchange,"script/js")
-        }
-        routingHandler.add(HttpString("GET"), "/docsspec.js") { exchange ->
-            serve("./src/main/resources/test.js",exchange,"script/js")
+        routingHandler.add(HttpString("GET"), "/openapi.json") { exchange ->
+            serveText(specJson!!,exchange,"application/json")
         }
     }
     private fun sendHttpResponse(exchange: HttpServerExchange, response: HttpResponse) {
@@ -439,22 +483,35 @@ class Router {
             exchange.responseHeaders.put(HttpString(name), value.toString())
         }
 
-        val inputStream = response.body.stream
-        val sinkChannel = exchange.responseChannel
-        val buffer = ByteBuffer.allocate(8192)  // Buffer size
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"), "GET, POST, PUT, DELETE, OPTIONS")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Headers"), "Content-Type, Authorization")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Credentials"), "true")
 
-        inputStream.use {
-            val channel = Channels.newChannel(inputStream)
-            while (channel.read(buffer) != -1) {
-                buffer.flip()
-                while (buffer.hasRemaining()) {
-                    sinkChannel.write(buffer)
+
+
+        if (exchange.requestMethod.toString() == "OPTIONS") {
+            exchange.statusCode = 204
+            exchange.endExchange() // For OPTIONS preflight requests, just end exchange here.
+        } else {
+            val inputStream = response.body.stream
+            val sinkChannel = exchange.responseChannel
+            val buffer = ByteBuffer.allocate(8192)  // Buffer size
+
+            inputStream.use {
+                val channel = Channels.newChannel(inputStream)
+                while (channel.read(buffer) != -1) {
+                    buffer.flip()
+                    while (buffer.hasRemaining()) {
+                        sinkChannel.write(buffer)
+                    }
+                    buffer.clear()
                 }
-                buffer.clear()
             }
+
+            exchange.endExchange()
         }
 
-        exchange.endExchange()
     }
     /**
      * Stops the HTTP server

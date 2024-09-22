@@ -9,7 +9,7 @@ import core.QSslConfig
 import  org.aquiles.core.HttpStatus
 import org.aquiles.core.*
 
- val myFilter = HttpMiddleware { next: HttpHandler ->
+internal val myFilter = HttpMiddleware { next: HttpHandler ->
     { request ->
         val start = System.currentTimeMillis()
         val response = next(request)
@@ -18,8 +18,8 @@ import org.aquiles.core.*
         response
     }
 }
-data class  User(val name :String, val age :Int);
-class MyScope : RoutingScope() {
+internal data class  User(val name :String, val age :Int);
+internal class MyScope : RoutingScope() {
 
 
 
@@ -96,11 +96,11 @@ fun main() {
         .withRoutes(myRoutes)
         .staticFiles("/download", directory = "./upload")
         .start(9000,
-            sslConfig = QSslConfig(
-            keyStorePath = "./keystore.jks",
+            /*sslConfig = QSslConfig(
+           keyStorePath = "./keystore.jks",
             keyStorePassword = "passwordd",
             keyPassword = "passwordd"
-        )
+        )*/
         )
 
 

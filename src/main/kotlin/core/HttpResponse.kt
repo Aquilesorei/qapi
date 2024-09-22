@@ -27,19 +27,22 @@ class HttpResponse private  constructor(var statusCode: HttpStatus, override var
     }
 
 
-    fun body(body : String) {
+    fun body(body : String): HttpResponse {
         this.body = Body(body)
+        return this
     }
-    fun body(body : ByteBuffer){
+    fun body(body : ByteBuffer): HttpResponse {
         this.body = Body(body)
+        return this
     }
 
     fun body(body : InputStream) {
         this.body = Body(body)
 
     }
-    fun body(body : Body) {
+    fun body(body : Body): HttpResponse {
         this.body = body
+        return this
     }
 
 

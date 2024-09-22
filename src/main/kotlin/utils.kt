@@ -15,12 +15,12 @@ import kotlin.reflect.full.primaryConstructor
 
 
 
-fun normalizePath(path: String): String {
+internal fun normalizePath(path: String): String {
     return path.replace(Regex("/{2,}"), "/")
 }
 
 @OptIn(ExperimentalStdlibApi::class)
-fun castBasedOnType(value: Any, kType: KType): Any? {
+internal fun castBasedOnType(value: Any, kType: KType): Any? {
     val type = kType.classifier
     return when (type) {
         is KClass<*> -> {
@@ -60,7 +60,7 @@ fun castBasedOnType(value: Any, kType: KType): Any? {
         }
     }
 }
-fun formatRoutePrefix(prefix: String?): String {
+internal fun formatRoutePrefix(prefix: String?): String {
     return prefix?.let {
         if (it.isEmpty()) {
             "" // Handle empty prefix case explicitly
@@ -73,7 +73,7 @@ fun formatRoutePrefix(prefix: String?): String {
 /**
  * Processes parameters from a request and maps them to function parameters
  */
- fun processParams(parameters: List<KParameter>, req: HttpRequest, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
+internal fun processParams(parameters: List<KParameter>, req: HttpRequest, multipartFields: Array<String> = arrayOf(), multipartFiles: Array<String> = arrayOf()): MutableMap<KParameter, Any> {
     val map = mutableMapOf<KParameter, Any>()
 
 
@@ -88,9 +88,16 @@ fun formatRoutePrefix(prefix: String?): String {
         param.name?.let { name ->
             val res = req.query(name) ?: req.path(name)
             if (res != null) {
-                castBasedOnType(res, param.type)?.let {
-                    map[param] = it
+
+                if(param.type.classifier == HttpRequest::class){
+                    map[param] = req
+                }else {
+                    castBasedOnType(res, param.type)?.let {
+                        map[param] = it
+                    }
                 }
+
+
             } else if (contentType == "application/json") {
 
 
@@ -110,6 +117,8 @@ fun formatRoutePrefix(prefix: String?): String {
                     isListUploadFile(param.type) -> map[param] = files
                     param.type.classifier == UploadFile::class && files.isNotEmpty() -> map[param] = files[0]
                 }
+            }else    if(param.type.classifier == HttpRequest::class){
+                map[param] = req
             }
         }
     }
@@ -139,7 +148,7 @@ private fun handleMultipartForm(request: HttpRequest, fields: Array<String>, fil
 }
 
 
-fun logRequest(request: HttpRequest, response : HttpResponse) {
+internal fun logRequest(request: HttpRequest, response : HttpResponse) {
 
     print("INFO:  ".green())
     print(" \"${request.method.name} ${request.uri} ${request.version}\" ")
@@ -153,7 +162,7 @@ fun logRequest(request: HttpRequest, response : HttpResponse) {
 }
 
 
-fun convertToSentenceCase(input: String): String {
+internal fun convertToSentenceCase(input: String): String {
     // Normalize separators and handle edge cases
     val normalized = input.trim().replace("_", "-")
 
@@ -168,7 +177,7 @@ fun convertToSentenceCase(input: String): String {
 }
 
 
-fun List<Pair<String, String>>.toMutableMap(): MutableMap<String, String> {
+internal fun List<Pair<String, String>>.toMutableMap(): MutableMap<String, String> {
     return this.associateTo(mutableMapOf()) { it }
 }
 

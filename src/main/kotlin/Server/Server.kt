@@ -11,6 +11,7 @@ import io.undertow.server.handlers.PathHandler
 import io.undertow.server.handlers.form.FormDataParser
 import io.undertow.server.handlers.resource.PathResourceManager
 import io.undertow.server.handlers.resource.ResourceHandler
+import io.undertow.util.Headers
 import io.undertow.util.HttpString
 import io.undertow.util.SameThreadExecutor
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -56,10 +57,12 @@ class HttpServer(
             ).setDirectoryListingEnabled(false))
         }
 
+        val corsHandler = CORSHandler(resourceHandler!!)
         val builder = Undertow.builder()
             .setServerOption(ENABLE_HTTP2, false)
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
             .setHandler(resourceHandler)
+
 
 
         if (sslConfig != null) {
@@ -76,7 +79,7 @@ class HttpServer(
             }
         } else {
             builder.addHttpListener(port, host, routingHandler)
-            println("Server started on http://$host:$port")
+            //println("Server started on http://$host:$port")
         }
 
         server = builder.build()
@@ -85,7 +88,6 @@ class HttpServer(
 
     fun port() = port
     fun host() = host
-
     fun stop() = server.stop()
 
 
@@ -120,5 +122,23 @@ class HttpServer(
             println("Error creating SSLContext: ${e.message}")
             return null
         }
-    }}
+    }
 
+}
+
+
+
+class CORSHandler(private val next: io.undertow.server.HttpHandler) : io.undertow.server.HttpHandler {
+    override fun handleRequest(exchange: HttpServerExchange) {
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"), "GET, POST, PUT, DELETE, OPTIONS")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Headers"), "Content-Type, Authorization")
+        println("fucking beach!!!")
+        if (exchange.requestMethod.toString() == "OPTIONS") {
+            exchange.statusCode = 204
+            exchange.endExchange() // For OPTIONS preflight requests, just end exchange here.
+        } else {
+            next.handleRequest(exchange)
+        }
+    }
+}
