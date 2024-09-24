@@ -67,7 +67,7 @@ internal class MyScope : RoutingScope() {
     }
 
     @Post("/upload", multipartFiles = ["file", "file1"])
-    fun upload(files: List<UploadFile>): HttpResponse {
+    fun upload(files: List<UploadFile>): String {
 
 
         val builder = StringBuilder()
@@ -77,7 +77,7 @@ internal class MyScope : RoutingScope() {
         }
 
 
-        return HttpResponse(HttpStatus.OK,"received $builder")
+        return "received $builder"
     }
 
 

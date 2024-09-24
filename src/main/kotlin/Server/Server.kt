@@ -7,6 +7,7 @@ import io.undertow.Undertow
 import io.undertow.UndertowOptions.ENABLE_HTTP2
 import io.undertow.server.HttpServerExchange
 import io.undertow.server.RoutingHandler
+import io.undertow.server.handlers.AccessControlListHandler
 import io.undertow.server.handlers.PathHandler
 import io.undertow.server.handlers.form.FormDataParser
 import io.undertow.server.handlers.resource.PathResourceManager
@@ -57,7 +58,7 @@ class HttpServer(
             ).setDirectoryListingEnabled(false))
         }
 
-        val corsHandler = CORSHandler(resourceHandler!!)
+        val corsHandler = CORSHandler(routingHandler)
         val builder = Undertow.builder()
             .setServerOption(ENABLE_HTTP2, false)
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
@@ -78,7 +79,7 @@ class HttpServer(
                 println("Server started on http://$host:$port")
             }
         } else {
-            builder.addHttpListener(port, host, routingHandler)
+            builder.addHttpListener(port, host, corsHandler)
             //println("Server started on http://$host:$port")
         }
 
@@ -130,9 +131,13 @@ class HttpServer(
 
 class CORSHandler(private val next: io.undertow.server.HttpHandler) : io.undertow.server.HttpHandler {
     override fun handleRequest(exchange: HttpServerExchange) {
+
+
         exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"), "GET, POST, PUT, DELETE, OPTIONS")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"),
+            "GET, POST, PUT, DELETE, OPTIONS")
         exchange.responseHeaders.put(HttpString("Access-Control-Allow-Headers"), "Content-Type, Authorization")
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Credentials"), "true")
         println("fucking beach!!!")
         if (exchange.requestMethod.toString() == "OPTIONS") {
             exchange.statusCode = 204

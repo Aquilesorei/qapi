@@ -478,22 +478,16 @@ class Router {
         }
     }
     private fun sendHttpResponse(exchange: HttpServerExchange, response: HttpResponse) {
+        // Set CORS headers early
+
+
         exchange.statusCode = response.statusCode.code
+
         response.headers.forEach { (name, value) ->
             exchange.responseHeaders.put(HttpString(name), value.toString())
         }
 
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"), "GET, POST, PUT, DELETE, OPTIONS")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Headers"), "Content-Type, Authorization")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Credentials"), "true")
 
-
-
-        if (exchange.requestMethod.toString() == "OPTIONS") {
-            exchange.statusCode = 204
-            exchange.endExchange() // For OPTIONS preflight requests, just end exchange here.
-        } else {
             val inputStream = response.body.stream
             val sinkChannel = exchange.responseChannel
             val buffer = ByteBuffer.allocate(8192)  // Buffer size
@@ -510,7 +504,7 @@ class Router {
             }
 
             exchange.endExchange()
-        }
+
 
     }
     /**
