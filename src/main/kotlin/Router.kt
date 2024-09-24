@@ -6,6 +6,7 @@ package org.aquiles
 
 import Server.HttpServer
 import com.google.gson.Gson
+import core.CorsConfig
 import core.QSslConfig
 import core.RouteData
 import io.undertow.Handlers
@@ -41,6 +42,15 @@ class Router {
     private val routingHandler: RoutingHandler = Handlers.routing()
      private var  resourceHandler : PathHandler? = null
     private val coroutine = CoroutineScope(Dispatchers.IO + SupervisorJob()) // Use Dispatchers.IO for IO-bound tasks
+
+    private var corsConfig: CorsConfig = CorsConfig()
+
+    // ... other methods ...
+
+    fun withCors(config: CorsConfig): Router {
+        this.corsConfig = config
+        return this
+    }
     init {
 
 
@@ -394,7 +404,7 @@ class Router {
         }
 
         printOpenAPISpec(port)
-       server = HttpServer(port, routes = allRoutes, resourceHandler = resourceHandler, routingHandler = routingHandler, sslConfig = sslConfig)
+       server = HttpServer(port, routes = allRoutes, resourceHandler = resourceHandler, routingHandler = routingHandler, sslConfig = sslConfig, corsConfig = corsConfig)
         server.start()
         println("Server started at http${if (sslConfig != null ) "s" else ""}://localhost:${server.port()}/")
         println("Press Enter to stop the server.")

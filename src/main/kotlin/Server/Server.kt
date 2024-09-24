@@ -1,5 +1,6 @@
 package Server
 
+import core.CorsConfig
 import core.QSslConfig
 import core.RouteData
 import io.undertow.Handlers.resource
@@ -35,14 +36,15 @@ import javax.net.ssl.TrustManagerFactory
 
 
 
-class HttpServer(
+internal class HttpServer(
     val port: Int,
     private val host: String = "0.0.0.0",
     private val routes: MutableList<RouteData>,
     private var resourceHandler: PathHandler?,
     val routingHandler: RoutingHandler,
     // Add optional parameters for keystore configuration
-    private  val sslConfig : QSslConfig? = null
+    private  val sslConfig : QSslConfig? = null,
+    private  val  corsConfig : CorsConfig ,
 ) {
     private lateinit var server: Undertow
 
@@ -58,7 +60,7 @@ class HttpServer(
             ).setDirectoryListingEnabled(false))
         }
 
-        val corsHandler = CORSHandler(routingHandler)
+        val corsHandler = CORSHandler(routingHandler,corsConfig)
         val builder = Undertow.builder()
             .setServerOption(ENABLE_HTTP2, false)
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
@@ -128,20 +130,24 @@ class HttpServer(
 }
 
 
-
-class CORSHandler(private val next: io.undertow.server.HttpHandler) : io.undertow.server.HttpHandler {
+internal  class CORSHandler(private val next: io.undertow.server.HttpHandler, private val corsConfig: CorsConfig) : io.undertow.server.HttpHandler {
     override fun handleRequest(exchange: HttpServerExchange) {
 
+        // Use values from corsConfig
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), corsConfig.allowedOrigins.joinToString(", "))
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"), corsConfig.allowedMethods.joinToString(", "))
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Headers"), corsConfig.allowedHeaders.joinToString(", "))
+        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Credentials"), corsConfig.allowCredentials.toString())
 
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Methods"),
-            "GET, POST, PUT, DELETE, OPTIONS")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Headers"), "Content-Type, Authorization")
-        exchange.responseHeaders.put(HttpString("Access-Control-Allow-Credentials"), "true")
-        println("fucking beach!!!")
+        // Optionally, set max age if configured
+        if (corsConfig.maxAge > 0) {
+            exchange.responseHeaders.put(HttpString("Access-Control-Max-Age"), corsConfig.maxAge.toString())
+        }
+
+
         if (exchange.requestMethod.toString() == "OPTIONS") {
             exchange.statusCode = 204
-            exchange.endExchange() // For OPTIONS preflight requests, just end exchange here.
+            exchange.endExchange()
         } else {
             next.handleRequest(exchange)
         }
