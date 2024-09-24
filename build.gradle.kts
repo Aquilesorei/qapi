@@ -26,6 +26,7 @@ dependencies {
     // https://mvnrepository.com/artifact/io.undertow/undertow-core
     implementation("io.undertow:undertow-core:2.3.14.Final")
 
+    implementation("commons-fileupload:commons-fileupload:1.4")
 
 }
 

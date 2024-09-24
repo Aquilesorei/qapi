@@ -1,6 +1,7 @@
 package openapi
 
 import core.RouteData
+import org.aquiles.UploadFile
 import org.aquiles.convertToSentenceCase
 import org.aquiles.core.HttpMethod
 import kotlin.reflect.KCallable
@@ -63,18 +64,43 @@ object OpenAPIGenerator {
                 }else if(param.type.isDataClass()){
 
                     if(method == HttpMethod.PUT || method == HttpMethod.POST){
-                        body =  RequestBody(
-                            content = mapOf(
-                                "application/json" to MediaType(
-                                    schema = Schema(
-                                        properties=properties,
-                                        required = required,
-                                        description = "example value",
-                                        example = createDummyInstance(param.type)
-                                    ),
+
+                        if(param.type.classifier == UploadFile::class){
+
+                            properties[it] =   Property(
+                                type = "string",
+                                required = !param.isOptional,
+                                readOnly =  true,
+                                format = "binary"
+                            )
+                            body =  RequestBody(
+                                content = mapOf(
+                                    "multipart/form-data" to MediaType(
+                                        schema = Schema(
+                                            type = "object",
+                                            properties=properties,
+                                            required = required,
+                                            description = "upload a file",
+                                            example = createDummyInstance(param.type)
+                                        ),
+                                    )
                                 )
                             )
-                        )
+                        }else{
+                            body =  RequestBody(
+                                content = mapOf(
+                                    "application/json" to MediaType(
+                                        schema = Schema(
+                                            properties=properties,
+                                            required = required,
+                                            description = "example value",
+                                            example = createDummyInstance(param.type)
+                                        ),
+                                    )
+                                )
+                            )
+                        }
+
                     }
                 }
                 else if(prname != "undefined"){

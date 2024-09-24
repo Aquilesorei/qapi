@@ -107,6 +107,7 @@ data class Components(
 
 
 data class Schema(
+    val type: String?=null,
     val items: Schema? = null,
     val properties: Map<Name, Property>? = null,
     val required: List<String>? = null,

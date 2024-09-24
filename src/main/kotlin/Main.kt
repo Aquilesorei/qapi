@@ -66,7 +66,17 @@ internal class MyScope : RoutingScope() {
         return HttpResponse(HttpStatus.OK , content = "Hello $lastname, $name", contentType = ContentType.TEXT_PLAIN)
     }
 
-    @Post("/upload", multipartFiles = ["file", "file1"])
+
+    @Post("/upload", multipartFiles = ["file"])
+    fun upload(file: UploadFile): String {
+
+            file.write("./upload/")
+
+
+        return "received ${file.fileName}"
+    }
+
+/*    @Post("/upload", multipartFiles = ["file", "file1"])
     fun upload(files: List<UploadFile>): String {
 
 
@@ -78,7 +88,7 @@ internal class MyScope : RoutingScope() {
 
 
         return "received $builder"
-    }
+    }*/
 
 
 

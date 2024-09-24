@@ -5,6 +5,7 @@ import core.QSslConfig
 import core.RouteData
 import io.undertow.Handlers.resource
 import io.undertow.Undertow
+import io.undertow.UndertowOptions
 import io.undertow.UndertowOptions.ENABLE_HTTP2
 import io.undertow.server.HttpServerExchange
 import io.undertow.server.RoutingHandler
@@ -63,6 +64,7 @@ internal class HttpServer(
         val corsHandler = CORSHandler(routingHandler,corsConfig)
         val builder = Undertow.builder()
             .setServerOption(ENABLE_HTTP2, false)
+           // .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, 100 * 1024 * 1024) // 100MB
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
             .setHandler(resourceHandler)
 
@@ -73,14 +75,15 @@ internal class HttpServer(
 
             // Check if SSLContext creation was successful
             if (sslContext != null) {
-                builder.addHttpsListener(port, host, sslContext, routingHandler)
-                println("Server started on https://$host:$port")
+                builder.addHttpsListener(port, host, sslContext, corsHandler)
+               // println("Server started on https://$host:$port")
             } else {
                 println("Failed to create SSLContext. Starting HTTP server instead.")
-                builder.addHttpListener(port, host, routingHandler)
-                println("Server started on http://$host:$port")
+                builder.addHttpListener(port, host, corsHandler)
+              //  println("Server started on http://$host:$port")
             }
-        } else {
+        }
+        else {
             builder.addHttpListener(port, host, corsHandler)
             //println("Server started on http://$host:$port")
         }

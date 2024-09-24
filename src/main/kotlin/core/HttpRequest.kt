@@ -4,10 +4,19 @@ import core.*
 import io.undertow.server.HttpServerExchange
 import io.undertow.util.Headers
 import io.undertow.util.NetworkUtils
+import java.io.BufferedReader
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.io.InputStreamReader
+import org.apache.commons.fileupload.MultipartStream
+import org.apache.commons.fileupload.MultipartStream.ProgressNotifier
+import org.apache.commons.fileupload.util.Streams
+import java.nio.charset.StandardCharsets
 
 import java.net.InetSocketAddress
 import java.util.*
-
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 
 data class HttpRequest private  constructor(
     var status: Int,
@@ -19,8 +28,10 @@ data class HttpRequest private  constructor(
     val queryParameters: MutableMap<String, Deque<String>>,
     val pathParameters: MutableMap<String, Deque<String>>,
     var multipartEntity: MultipartEntity? = null,
+    val  parts : List<MultipartPart> = listOf(),
     var source: RequestSource? = null,
-    val  version : String = HTTP_1_1
+    val  version : String = HTTP_1_1,
+
 ) : HTTPMessage
 {
 
@@ -85,7 +96,25 @@ data class HttpRequest private  constructor(
 
 
             exchange.startBlocking()
+
+            var parts  : List<MultipartPart> = listOf()
+            if (isMultipartRequest(exchange)) {
+                // Check if multipart
+
+
+
+
+                val contentTypeHeader = exchange.requestHeaders.getFirst(Headers.CONTENT_TYPE)
+                val boundary = extractBoundary(contentTypeHeader)
+
+                parts = parseMultipartData(boundary!!,exchange.inputStream);
+                /*  println(parts.size)
+                  request.multipartEntity = MultipartEntity(contentTypeHeader!!, boundary!!)
+                      .parseForm(exchange)*/
+            }
             val uri = exchange.requestURI;
+
+
             val request = HttpRequest(
                 queryParameters = exchange.queryParameters,
                 pathParameters = exchange.pathParameters,
@@ -96,19 +125,14 @@ data class HttpRequest private  constructor(
                 body = Body(exchange.inputStream),
                 headers = exchange.requestHeaders.toHeaderMap(),
                 source = source,
-                version = exchange.protocol.toString()
+                version = exchange.protocol.toString(),
+                parts = parts
             );
 
 
 
 
-            if (isMultipartRequest(exchange)) { // Check if multipart
-                val contentTypeHeader = exchange.requestHeaders.getFirst(Headers.CONTENT_TYPE)
-                val boundary = extractBoundary(contentTypeHeader)
 
-                request.multipartEntity = MultipartEntity(contentTypeHeader!!, boundary!!)
-                    .parseForm(exchange)
-            }
             return request
         }
 
@@ -133,6 +157,81 @@ data class HttpRequest private  constructor(
 
     }
 }
+
+
+
+
+
+
+fun parseMultipartData(boundary: String, inputStream: InputStream): List<MultipartPart> {
+    val parts = mutableListOf<MultipartPart>()
+    val boundaryBytes = boundary.toByteArray(StandardCharsets.UTF_8)
+   // val notifier = ProgressNotifier()
+
+
+    val multipartStream = MultipartStream(inputStream, boundaryBytes,8192,)
+
+    var nextPart = multipartStream.skipPreamble()
+    while (nextPart) {
+        // Parse headers
+        val headers = mutableMapOf<String, String>()
+        val headerStream = multipartStream.readHeaders()
+        val headerLines = headerStream.split("\r\n").filter { it.isNotBlank() }
+
+        headerLines.forEach { headerLine ->
+            val (key, value) = headerLine.split(": ", limit = 2)
+            headers[key] = value
+        }
+
+        // Extract content disposition and part name
+        val contentDisposition = headers["Content-Disposition"]
+        val partName = contentDisposition?.substringAfter("name=\"")?.substringBefore("\"")
+
+        // Handle file parts or text parts
+        val contentDispositionIsFile = contentDisposition?.contains("filename=\"") == true
+        if (contentDispositionIsFile) {
+            val filename = contentDisposition?.substringAfter("filename=\"")?.substringBefore("\"")
+            val contentType = headers["Content-Type"] ?: "application/octet-stream"
+
+
+            // Use a buffer to handle large file efficiently
+
+            val outputStream = ByteArrayOutputStream()
+            multipartStream.readBodyData(outputStream)
+
+
+            parts.add(
+                MultipartFilePart(
+                    headers,
+                    contentDisposition,
+                    partName ?: "",
+                    filename ?: "",
+                    contentType,
+                    outputStream.toByteArray().inputStream()
+                )
+            )
+        } else {
+            // Handle text part
+            val outputStream = ByteArrayOutputStream()
+            multipartStream.readBodyData(outputStream)
+            val partContent = String(outputStream.toByteArray(), StandardCharsets.UTF_8)
+
+            parts.add(
+                MultipartTextPart(
+                    headers,
+                    contentDisposition,
+                    partContent,
+                    partName ?: ""
+                )
+            )
+        }
+
+        nextPart = multipartStream.readBoundary()
+    }
+
+    return parts
+}
+
 
 
 data class RequestSource(val address: String, val port: Int? = 0, val scheme: String? = null)

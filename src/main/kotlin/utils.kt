@@ -3,6 +3,8 @@ package org.aquiles
 import com.andreapivetta.kolor.*
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import core.MultipartFilePart
+import core.MultipartTextPart
 import openapi.Property
 import org.aquiles.core.ContentType
 import org.aquiles.core.HttpRequest
@@ -113,9 +115,11 @@ internal fun processParams(parameters: List<KParameter>, req: HttpRequest, multi
             } else if(contentType?.startsWith("multipart/form-data") == true){
 
                 val files = handleMultipartForm(req, files = multipartFiles, fields = multipartFields)
+                println(files.size)
                 when {
                     isListUploadFile(param.type) -> map[param] = files
                     param.type.classifier == UploadFile::class && files.isNotEmpty() -> map[param] = files[0]
+
                 }
             }else    if(param.type.classifier == HttpRequest::class){
                 map[param] = req
@@ -130,19 +134,34 @@ internal fun processParams(parameters: List<KParameter>, req: HttpRequest, multi
 /**
  * Handles multipart form data from a request
  */
-private fun handleMultipartForm(request: HttpRequest, fields: Array<String>, files: Array<String>): List<UploadFile> {
+private fun handleMultipartForm(req: HttpRequest, fields: Array<String>, files: Array<String>): List<UploadFile> {
+
+
+
+
     val list = mutableListOf<UploadFile>()
-/*    val multipartForm = MultipartFormBody.from(request)
+
+        req.parts.forEach { part ->
+            when (part) {
+                is MultipartTextPart ->{
+
+                }
+
+                is MultipartFilePart -> {
+                    val filename = part.filename
+                    val inputStream = part.inputStream
 
 
-
-
-    files.forEach { field ->
-        multipartForm.file(field)?.let { fileInput ->
-            val up = UploadFile(fileInput.filename, fileInput.contentType, fileInput.content)
-            list.add(up)
+                   list.add(UploadFile(
+                       fileName = filename,
+                       contentType = ContentType(part.contentType),
+                       content = inputStream,
+                   ))
+                }
+            }
         }
-    }*/
+
+
 
     return list
 }
