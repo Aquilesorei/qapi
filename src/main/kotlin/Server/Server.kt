@@ -51,15 +51,14 @@ internal class HttpServer(
 
     fun start() {
         // Default resource handler for other content
-        resourceHandler = resourceHandler?.apply {
+
+        val rouh =  PathHandler()
+
+            rouh.
             addPrefixPath("/", ResourceHandler(
                 PathResourceManager(Paths.get("./src/main/resources"), 100)
             ).setDirectoryListingEnabled(false))
-        } ?: PathHandler().apply {
-            addPrefixPath("/", ResourceHandler(
-                PathResourceManager(Paths.get("./src/main/resources"), 100)
-            ).setDirectoryListingEnabled(false))
-        }
+
 
         val corsHandler = CORSHandler(routingHandler,corsConfig)
         val builder = Undertow.builder()
@@ -67,6 +66,7 @@ internal class HttpServer(
            // .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, 100 * 1024 * 1024) // 100MB
             .setWorkerThreads(32 * Runtime.getRuntime().availableProcessors())
             .setHandler(resourceHandler)
+            .setHandler(rouh)
 
 
 
