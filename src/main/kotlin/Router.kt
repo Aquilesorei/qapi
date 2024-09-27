@@ -10,15 +10,13 @@ import core.CorsConfig
 import core.QSslConfig
 import core.RouteData
 import io.undertow.Handlers
+import io.undertow.Handlers.routing
 import io.undertow.server.HttpServerExchange
 import io.undertow.server.RoutingHandler
 import io.undertow.server.handlers.PathHandler
 import io.undertow.server.handlers.resource.PathResourceManager
 import io.undertow.server.handlers.resource.ResourceHandler
-import io.undertow.util.BadRequestException
-import io.undertow.util.Headers
-import io.undertow.util.HttpString
-import io.undertow.util.SameThreadExecutor
+import io.undertow.util.*
 import kotlinx.coroutines.*
 import openapi.*
 import org.aquiles.core.*
@@ -27,6 +25,7 @@ import java.io.*
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.reflect.KCallable
 import kotlin.reflect.full.callSuspend
@@ -346,17 +345,81 @@ class Router {
      * path is the http path
      */
     fun staticFiles(path  : String,directory : String): Router {
+        fun getFileExtension(path: Path): String {
+            val fileName = path.fileName.toString()
+            val dotIndex = fileName.lastIndexOf('.')
+            return if (dotIndex != -1 && dotIndex < fileName.length - 1) {
+                fileName.substring(dotIndex + 1)
+            } else {
+                ""
+            }
+        }
+
+        fun serveFile(exchange: HttpServerExchange, filePath: Path) {
+            val mimeMappings = MimeMappings.DEFAULT
+            val fileExtension = getFileExtension(filePath)
+            val mimeType = mimeMappings.getMimeType(fileExtension) ?: "application/octet-stream"
+
+            // Set the content type
+            exchange.responseHeaders.put(Headers.CONTENT_TYPE, mimeType)
+
+            // Set up chunked transfer encoding
+            exchange.responseHeaders.put(Headers.TRANSFER_ENCODING, "chunked")
+
+            val bufferSize = 8192  // Buffer size for chunked transfer
+            val buffer = ByteBuffer.allocate(bufferSize)
+
+            // Use FileInputStream to read the file
+            FileInputStream(filePath.toFile()).use { inputStream ->
+                val channel = Channels.newChannel(inputStream)
+                val sinkChannel = exchange.responseChannel
+
+                // Read file in chunks and write to the response
+                while (channel.read(buffer) != -1) {
+                    buffer.flip()
+                    while (buffer.hasRemaining()) {
+                        sinkChannel.write(buffer)
+                    }
+                    buffer.clear()
+                }
+            }
+
+            // End the exchange
+            exchange.endExchange()
+        }
+
 
 
         val  directoryPath = Paths.get(directory)
 
 
-        val routingHandler = PathHandler()
+
         if (Files.exists(directoryPath) && Files.isDirectory(directoryPath)) {
-            routingHandler.addPrefixPath(path, ResourceHandler(
-                PathResourceManager(directoryPath, 100)
-            ).setDirectoryListingEnabled(false))
-            resourceHandler = routingHandler
+
+
+            routingHandler.add(
+                HttpString("GET"),
+                "/$path/{fileName}"
+            ) { exchange ->
+
+
+                exchange.dispatch(SameThreadExecutor.INSTANCE, Runnable {
+                    coroutine.launch {
+                        val fileName = exchange.queryParameters["fileName"]?.firstOrNull()
+                        if (fileName != null) {
+                            val filePath = directoryPath.resolve(fileName)
+                            if (Files.exists(filePath) && !Files.isDirectory(filePath)) {
+                                serveFile(exchange, filePath)
+                            } else {
+                                exchange.setStatusCode(404).endExchange()
+                            }
+                        } else {
+                            exchange.setStatusCode(400).endExchange()
+                        }
+                    }
+                })
+
+            }
         } else {
          throw  FileNotFoundException("Directory does not exist")
         }
