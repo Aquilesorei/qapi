@@ -3,11 +3,16 @@ package org.aquiles
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 
+import MyPostsScope
 import kotlinx.coroutines.delay
 import Server.HttpServer
 import core.QSslConfig
+import io.undertow.Handlers.resource
+import io.undertow.Undertow
+import io.undertow.server.handlers.resource.PathResourceManager
 import  org.aquiles.core.HttpStatus
 import org.aquiles.core.*
+import java.nio.file.Paths
 
 internal val myFilter = HttpMiddleware { next: HttpHandler ->
     { request ->
@@ -102,15 +107,16 @@ fun main() {
 
 
     val router = Router()
-    router.addScope(MyScope(),prefix = "/api")
+    router.addScope(MyPostsScope(),prefix = "/api")
         .withRoutes(myRoutes)
-        .staticFiles("/download", directory = "./upload")
+        .staticFiles( path = "download", directory = "./upload")
         .start(9000,
-            /*sslConfig = QSslConfig(
+/*sslConfig = QSslConfig(
            keyStorePath = "./keystore.jks",
             keyStorePassword = "passwordd",
             keyPassword = "passwordd"
         )*/
+
         )
 
 
