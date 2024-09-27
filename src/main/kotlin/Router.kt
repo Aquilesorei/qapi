@@ -45,7 +45,6 @@ class Router {
 
     private var corsConfig: CorsConfig = CorsConfig()
 
-    // ... other methods ...
 
     fun withCors(config: CorsConfig): Router {
         this.corsConfig = config
