@@ -96,10 +96,8 @@ Add the necessary dependencies to your project. (Include instructions here based
     fun main() {
         val router = Router()
         router.addScope(MyScope(), prefix = "/api")
-            .withRoutes(myRoutes)
-            .staticFiles("/download", directory = "./upload")
+            .start(9000)
 
-        router.printOpenAPISpec()
     }
     ```
 
